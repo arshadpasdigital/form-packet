@@ -15,6 +15,11 @@ const paths = [
   "/",
   "/guides",
   ...slugs.map((slug) => `/guides/${slug}`),
+  "/photo-compressor",
+  "/pdf-compressor",
+  "/photo-to-pdf",
+  "/about",
+  "/contact",
   "/privacy",
   "/limitations",
 ]

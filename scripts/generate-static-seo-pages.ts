@@ -139,6 +139,14 @@ function guideBody(guide: GuideSnapshot) {
   return `<main id="main-content" class="page-frame shell-width"><article class="guide-article"><div class="guide-article-meta"><span>${escapeHtml(guide.audience)}</span><span>Updated for a local-first workflow</span></div><h1>${escapeHtml(guide.title)}</h1><p>${escapeHtml(guide.summary)}</p><section><h2>Checks to record</h2>${list(guide.checks)}</section><section><h2>A safe preparation sequence</h2>${list(guide.steps)}</section><section><h2>Common avoidable mistakes</h2>${list(guide.mistakes)}</section><p><a href="/prepare">Prepare an application pack</a> · <a href="/guides">Browse all guides</a></p></article></main>`
 }
 
+function toolBody(title: string, description: string) {
+  return `<main id="main-content" class="page-frame shell-width"><h1>${escapeHtml(title)}</h1><p>${escapeHtml(description)}</p><p><a href="/">Return to FormPack</a> · <a href="/quick-tools">More quick tools</a></p></main>`
+}
+
+function infoBody(title: string, description: string) {
+  return `<main id="main-content" class="page-frame shell-width"><h1>${escapeHtml(title)}</h1><p>${escapeHtml(description)}</p><p><a href="/">Return to FormPack</a></p></main>`
+}
+
 export function generateStaticSeoPages(root = process.cwd()) {
   const outDir = path.join(root, "dist")
   const baseHtml = fs.readFileSync(path.join(outDir, "index.html"), "utf8")
@@ -197,6 +205,76 @@ export function generateStaticSeoPages(root = process.cwd()) {
         url: `${siteUrl}/guides/${guide.slug}`,
       },
     })),
+    {
+      pathName: "/photo-compressor",
+      title: "Compress a photo to an exact KB range | FormPack",
+      description:
+        "Compress a JPG or PNG photo to the exact file-size range required by an exam or application portal. Files stay in your browser.",
+      body: toolBody(
+        "Photo compressor",
+        "Compress a JPG or PNG photo to the exact KB range your portal requires, privately in your browser.",
+      ),
+    },
+    {
+      pathName: "/pdf-compressor",
+      title: "Compress a PDF to an exact KB range | FormPack",
+      description:
+        "Compress a PDF to the exact file-size range required by an exam or application portal. Files stay in your browser.",
+      body: toolBody(
+        "PDF compressor",
+        "Compress a PDF to the exact KB range your portal requires, privately in your browser.",
+      ),
+    },
+    {
+      pathName: "/photo-to-pdf",
+      title: "Combine photos into a PDF | FormPack",
+      description:
+        "Combine two or more photos into one PDF locally in your browser, with an optional target size range.",
+      body: toolBody(
+        "Photo to PDF",
+        "Combine photos, signatures, or thumb impressions into one PDF locally in your browser.",
+      ),
+    },
+    {
+      pathName: "/about",
+      title: "About FormPack",
+      description:
+        "Learn why FormPack prepares application files locally and what it can and cannot verify.",
+      body: infoBody(
+        "About FormPack",
+        "FormPack helps applicants turn a strict upload rule into a file that passes its measurable checks, without sending the file anywhere.",
+      ),
+    },
+    {
+      pathName: "/contact",
+      title: "Contact FormPack",
+      description:
+        "Questions, corrections, or feedback about FormPack's tools and guides.",
+      body: infoBody(
+        "Contact FormPack",
+        "Questions, corrections, or feedback about FormPack's tools and guides.",
+      ),
+    },
+    {
+      pathName: "/privacy",
+      title: "Your documents stay on your device | FormPack",
+      description:
+        "FormPack processes application files locally in your browser and does not receive your documents.",
+      body: infoBody(
+        "Your documents stay on your device",
+        "FormPack processes application files locally in your browser and does not receive your documents.",
+      ),
+    },
+    {
+      pathName: "/limitations",
+      title: "What FormPack can and cannot confirm | FormPack",
+      description:
+        "FormPack measures file format and size locally; visual review and portal approval remain your responsibility.",
+      body: infoBody(
+        "What FormPack can and cannot confirm",
+        "FormPack measures file format and size locally; visual review and portal approval remain your responsibility.",
+      ),
+    },
     ...utilityPaths.map((pathName) => ({
       pathName,
       title: "FormPack file workflow",

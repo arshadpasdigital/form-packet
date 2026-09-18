@@ -7,8 +7,10 @@ import {
 
 import { AppShell } from "@/components"
 import {
+  AboutPage,
   CategoryPage,
   CheckPage,
+  ContactPage,
   DownloadPage,
   FileWorkspacePage,
   FilesPage,
@@ -168,6 +170,18 @@ const limitationsRoute = createRoute({
   component: LimitationsPage,
 })
 
+const aboutRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/about",
+  component: AboutPage,
+})
+
+const contactRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/contact",
+  component: ContactPage,
+})
+
 const guidesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/guides",
@@ -202,6 +216,8 @@ const routeTree = rootRoute.addChildren([
   photoToPdfRoute,
   privacyRoute,
   limitationsRoute,
+  aboutRoute,
+  contactRoute,
   guidesRoute,
   guideRoute,
 ])

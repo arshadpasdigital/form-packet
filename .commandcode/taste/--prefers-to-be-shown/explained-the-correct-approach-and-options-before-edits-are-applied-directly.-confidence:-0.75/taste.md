@@ -1,0 +1,8 @@
+# - Prefers to be shown/explained the correct approach and options before edits are applied directly. Confidence: 0.75
+- Prefers to be shown/explained the correct approach and options before edits are applied directly. Confidence: 0.75
+- Prefers multi-step tasks be executed step by step (sequenced, incremental) rather than all at once. Confidence: 0.8
+- Prefers a task tracker (todo/checklist) be used to track progress across multi-step work. Confidence: 0.8
+- Values polished, easy-to-use UX and expects UI changes to prioritize clarity and usability. Confidence: 0.8
+- Prefers leveraging the design/UX skill and its reference materials when making UI/UX changes. Confidence: 0.85
+- Prefers primary action buttons to be visually prominent (distinct accent color) once enabled, and results/previews brought into view rather than left hidden below the fold. Confidence: 0.7
+- Prefers image upload previews to adapt to the image's intrinsic aspect ratio (e.g., object-contain) and be clamped so large images never overflow their container, rather than forcing a fixed-size box. Confidence: 0.75

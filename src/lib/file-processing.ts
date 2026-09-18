@@ -2,6 +2,8 @@ import { PDFDocument } from "pdf-lib"
 
 export type ImageOutputFormat = "JPEG" | "PNG"
 
+export type FitMode = "stretch" | "contain" | "cover"
+
 export type ImageRangeResult = {
   blob: Blob
   width: number
@@ -9,30 +11,41 @@ export type ImageRangeResult = {
   inRange: boolean
 }
 
+type CanvasLike = HTMLCanvasElement | OffscreenCanvas
+type Canvas2DContext = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D
+
+function createCanvas(width: number, height: number): CanvasLike {
+  if (typeof OffscreenCanvas !== "undefined") {
+    return new OffscreenCanvas(Math.max(1, width), Math.max(1, height))
+  }
+  const canvas = document.createElement("canvas")
+  canvas.width = Math.max(1, Math.round(width))
+  canvas.height = Math.max(1, Math.round(height))
+  return canvas
+}
+
+function get2dContext(canvas: CanvasLike): Canvas2DContext | null {
+  return canvas.getContext("2d") as Canvas2DContext | null
+}
+
 function loadImage(file: File) {
-  return new Promise<HTMLImageElement>((resolve, reject) => {
-    const url = URL.createObjectURL(file)
-    const image = new Image()
-    image.onload = () => {
-      URL.revokeObjectURL(url)
-      resolve(image)
-    }
-    image.onerror = () => {
-      URL.revokeObjectURL(url)
-      reject(new Error("The image could not be decoded."))
-    }
-    image.src = url
-  })
+  return createImageBitmap(file)
 }
 
 function canvasToBlob(
-  canvas: HTMLCanvasElement,
+  canvas: CanvasLike,
   type: string,
   quality?: number,
 ) {
+  if ("convertToBlob" in canvas) {
+    return (canvas as OffscreenCanvas).convertToBlob({ type, quality })
+  }
   return new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(
-      (blob) => (blob ? resolve(blob) : reject(new Error("The browser could not encode this image."))),
+    ;(canvas as HTMLCanvasElement).toBlob(
+      (blob) =>
+        blob
+          ? resolve(blob)
+          : reject(new Error("The browser could not encode this image.")),
       type,
       quality,
     )
@@ -45,19 +58,58 @@ export async function imageToBlob(
   height: number,
   format: ImageOutputFormat,
   quality = 0.86,
+  fit: FitMode = "cover",
 ) {
   const image = await loadImage(file)
-  const canvas = document.createElement("canvas")
-  canvas.width = Math.max(1, Math.round(width))
-  canvas.height = Math.max(1, Math.round(height))
-  const context = canvas.getContext("2d")
+  const canvas = createCanvas(width, height)
+  const context = get2dContext(canvas)
   if (!context) throw new Error("The browser could not create a canvas.")
+
+  const targetWidth = canvas.width
+  const targetHeight = canvas.height
+  const sourceWidth = image.width
+  const sourceHeight = image.height
+
   if (format === "JPEG") {
     context.fillStyle = "#ffffff"
-    context.fillRect(0, 0, canvas.width, canvas.height)
+    context.fillRect(0, 0, targetWidth, targetHeight)
+  } else if (fit === "contain") {
+    context.clearRect(0, 0, targetWidth, targetHeight)
   }
-  context.drawImage(image, 0, 0, canvas.width, canvas.height)
-  return canvasToBlob(canvas, format === "PNG" ? "image/png" : "image/jpeg", quality)
+
+  if (fit === "contain") {
+    const scale = Math.min(targetWidth / sourceWidth, targetHeight / sourceHeight)
+    const drawWidth = sourceWidth * scale
+    const drawHeight = sourceHeight * scale
+    const drawX = (targetWidth - drawWidth) / 2
+    const drawY = (targetHeight - drawHeight) / 2
+    context.drawImage(image, drawX, drawY, drawWidth, drawHeight)
+  } else if (fit === "cover") {
+    const scale = Math.max(targetWidth / sourceWidth, targetHeight / sourceHeight)
+    const cropWidth = targetWidth / scale
+    const cropHeight = targetHeight / scale
+    const cropX = (sourceWidth - cropWidth) / 2
+    const cropY = (sourceHeight - cropHeight) / 2
+    context.drawImage(
+      image,
+      cropX,
+      cropY,
+      cropWidth,
+      cropHeight,
+      0,
+      0,
+      targetWidth,
+      targetHeight,
+    )
+  } else {
+    context.drawImage(image, 0, 0, targetWidth, targetHeight)
+  }
+
+  return canvasToBlob(
+    canvas,
+    format === "PNG" ? "image/png" : "image/jpeg",
+    quality,
+  )
 }
 
 export async function compressImageToRange(
@@ -67,21 +119,34 @@ export async function compressImageToRange(
   format: ImageOutputFormat,
   minKb: number,
   maxKb: number,
+  fit: FitMode = "cover",
 ): Promise<ImageRangeResult> {
-  const qualities = format === "PNG" ? [1] : [0.96, 0.92, 0.88, 0.84, 0.8, 0.74, 0.68, 0.62, 0.56, 0.5, 0.42, 0.34, 0.26, 0.18, 0.1]
+  const qualities =
+    format === "PNG"
+      ? [1]
+      : [
+          0.96, 0.92, 0.88, 0.84, 0.8, 0.74, 0.68, 0.62, 0.56, 0.5, 0.42, 0.34,
+          0.26, 0.18, 0.1,
+        ]
   const candidates: Array<{ blob: Blob; quality: number; distance: number }> = []
 
   for (const quality of qualities) {
-    const blob = await imageToBlob(file, width, height, format, quality)
+    const blob = await imageToBlob(file, width, height, format, quality, fit)
     const sizeKb = blob.size / 1024
-    const distance = sizeKb < minKb ? minKb - sizeKb : sizeKb > maxKb ? sizeKb - maxKb : 0
+    const distance =
+      sizeKb < minKb
+        ? minKb - sizeKb
+        : sizeKb > maxKb
+          ? sizeKb - maxKb
+          : 0
     candidates.push({ blob, quality, distance })
     if (distance === 0 && format === "JPEG") break
   }
 
   const selected = candidates.reduce((best, candidate) => {
     if (candidate.distance < best.distance) return candidate
-    if (candidate.distance === best.distance && candidate.quality > best.quality) return candidate
+    if (candidate.distance === best.distance && candidate.quality > best.quality)
+      return candidate
     return best
   })
 
@@ -100,8 +165,8 @@ export async function cropSignature(
   removeBackground: boolean,
 ) {
   const image = await loadImage(file)
-  const sourceWidth = image.naturalWidth || image.width
-  const sourceHeight = image.naturalHeight || image.height
+  const sourceWidth = image.width
+  const sourceHeight = image.height
   let cropWidth = sourceWidth
   let cropHeight = sourceHeight
 
@@ -116,27 +181,62 @@ export async function cropSignature(
   const cropX = Math.max(0, (sourceWidth - cropWidth) / 2)
   const cropY = Math.max(0, (sourceHeight - cropHeight) / 2)
   const outputWidth = Math.min(1200, Math.max(300, Math.round(cropWidth)))
-  const outputHeight = Math.max(1, Math.round(outputWidth * (cropHeight / cropWidth)))
-  const canvas = document.createElement("canvas")
-  canvas.width = outputWidth
-  canvas.height = outputHeight
-  const context = canvas.getContext("2d")
+  const outputHeight = Math.max(
+    1,
+    Math.round(outputWidth * (cropHeight / cropWidth)),
+  )
+  const canvas = createCanvas(outputWidth, outputHeight)
+  const context = get2dContext(canvas)
   if (!context) throw new Error("The browser could not create a canvas.")
   context.fillStyle = removeBackground ? "#ffffff" : "transparent"
   context.fillRect(0, 0, outputWidth, outputHeight)
-  context.drawImage(image, cropX, cropY, cropWidth, cropHeight, 0, 0, outputWidth, outputHeight)
+  context.drawImage(
+    image,
+    cropX,
+    cropY,
+    cropWidth,
+    cropHeight,
+    0,
+    0,
+    outputWidth,
+    outputHeight,
+  )
   if (!trimEdges) {
     // The crop preset is still applied; this flag is kept explicit for the result copy.
   }
   return canvasToBlob(canvas, "image/jpeg", 0.9)
 }
 
-async function imagesToPdf(files: File[], pageSize: "A4" | "Letter", quality: number) {
+async function imagesToPdf(
+  files: File[],
+  pageSize: "A4" | "Letter",
+  quality: number,
+) {
   const pdf = await PDFDocument.create()
-  const pageDimensions = pageSize === "Letter" ? [612, 792] : [595.28, 841.89]
+  const pageDimensions =
+    pageSize === "Letter" ? [612, 792] : [595.28, 841.89]
 
   for (const file of files) {
-    const imageBlob = await imageToBlob(file, 1600, 1600, "JPEG", quality)
+    const source = await loadImage(file)
+    const maxDimension = 1600
+    const ratio = source.width / source.height
+    const targetWidth =
+      source.width >= source.height
+        ? Math.min(maxDimension, source.width)
+        : Math.round(Math.min(maxDimension, source.height) * ratio)
+    const targetHeight =
+      source.width >= source.height
+        ? Math.round(targetWidth / ratio)
+        : Math.min(maxDimension, source.height)
+
+    const imageBlob = await imageToBlob(
+      file,
+      targetWidth,
+      targetHeight,
+      "JPEG",
+      quality,
+      "stretch",
+    )
     const imageBytes = new Uint8Array(await imageBlob.arrayBuffer())
     const image = await pdf.embedJpg(imageBytes)
     const page = pdf.addPage(pageDimensions as [number, number])
@@ -169,17 +269,17 @@ export async function imagesToPdfRange(
   for (const quality of qualities) {
     const blob = await imagesToPdf(files, pageSize, quality)
     const sizeKb = blob.size / 1024
-    const distance = sizeKb < minKb ? minKb - sizeKb : sizeKb > maxKb ? sizeKb - maxKb : 0
+    const distance =
+      sizeKb < minKb
+        ? minKb - sizeKb
+        : sizeKb > maxKb
+          ? sizeKb - maxKb
+          : 0
     candidates.push({ blob, distance })
     if (distance === 0) break
   }
-  const selected = candidates.reduce((best, candidate) => candidate.distance < best.distance ? candidate : best)
+  const selected = candidates.reduce((best, candidate) =>
+    candidate.distance < best.distance ? candidate : best,
+  )
   return { blob: selected.blob, inRange: selected.distance === 0 }
-}
-
-export async function rewritePdf(file: File) {
-  const source = await file.arrayBuffer()
-  const pdf = await PDFDocument.load(source)
-  const bytes = await pdf.save({ useObjectStreams: true, addDefaultPage: false })
-  return { blob: new Blob([bytes.buffer as ArrayBuffer], { type: "application/pdf" }), pageCount: pdf.getPageCount() }
 }

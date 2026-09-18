@@ -19,10 +19,17 @@ import {
   SlidersHorizontal,
   Trash2,
 } from "lucide-react"
-import { useEffect, useState, type ChangeEvent, type DragEvent } from "react"
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type DragEvent,
+} from "react"
 
 import {
   ActionLink,
+  AdSlot,
   CheckLine,
   PageFrame,
   PrivacyNotice,
@@ -38,14 +45,18 @@ import {
 } from "@/data"
 import { usePack } from "@/pack-store"
 import { useFix } from "@/fix-store"
+import { adSlots } from "@/lib/ads"
+import { track } from "@/lib/analytics"
 import {
   compressImageToRange,
+  compressPdfToRange,
   cropSignature,
   imageToBlob,
-  type ImageOutputFormat,
   imagesToPdfRange,
-  rewritePdf,
-} from "@/lib/file-processing"
+  readPdfPageCount,
+  type FitMode,
+  type ImageOutputFormat,
+} from "@/lib/processing-client"
 import { SeoHead, SITE_URL } from "@/seo"
 import { getSeoGuide, seoGuides } from "@/seo-data"
 
@@ -61,6 +72,7 @@ export function PhotoCompressorPage() {
   const [targetWidth, setTargetWidth] = useState("")
   const [targetHeight, setTargetHeight] = useState("")
   const [outputFormat, setOutputFormat] = useState<"JPEG" | "PNG">("JPEG")
+  const [fit, setFit] = useState<FitMode>("cover")
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState("")
   const [result, setResult] = useState<{
@@ -70,6 +82,14 @@ export function PhotoCompressorPage() {
     height: number
     inRange: boolean
   } | null>(null)
+  const resultRef = useRef<HTMLElement | null>(null)
+
+  useEffect(() => {
+    if (!result) return
+    requestAnimationFrame(() => {
+      resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+    })
+  }, [result])
 
   useEffect(() => {
     if (!source) {
@@ -123,6 +143,7 @@ export function PhotoCompressorPage() {
     setProcessing(true)
     setError("")
     setResult(null)
+    track({ name: "tool_started", tool: "photo-compressor" })
     try {
       const processed = await compressImageToRange(
         source,
@@ -131,8 +152,14 @@ export function PhotoCompressorPage() {
         outputFormat,
         minValue,
         maxValue,
+        fit,
       )
       setResult({ ...processed, url: URL.createObjectURL(processed.blob) })
+      track({
+        name: "tool_completed",
+        tool: "photo-compressor",
+        inRange: processed.inRange,
+      })
     } catch {
       setError("The photo could not be processed in this browser. Try another image.")
     } finally {
@@ -173,6 +200,8 @@ export function PhotoCompressorPage() {
           </div>
         </div>
 
+        <AdSlot slot={adSlots.toolTop} className="mb-6" />
+
         <div className="grid grid-cols-[minmax(0,1.08fr)_minmax(22rem,.92fr)] gap-px border border-[var(--border)] bg-[var(--border)] max-[50rem]:grid-cols-1">
           <section
             className="min-w-0 bg-[var(--surface)] p-[clamp(1.25rem,3vw,2rem)]"
@@ -198,9 +227,9 @@ export function PhotoCompressorPage() {
                 className="absolute h-px w-px overflow-hidden opacity-0"
               />
               {source && previewUrl ? (
-                <span className="grid h-60 w-[min(100%,18rem)] place-items-center bg-[var(--surface)] [background-image:linear-gradient(45deg,var(--raised)_25%,transparent_25%),linear-gradient(-45deg,var(--raised)_25%,transparent_25%),linear-gradient(45deg,transparent_75%,var(--raised)_75%),linear-gradient(-45deg,transparent_75%,var(--raised)_75%)] [background-position:0_0,0_.5rem,.5rem_-.5rem,-.5rem_0] [background-size:1rem_1rem] [outline:1px_solid_oklch(0_0_0_/_0.1)]">
+                <span className="flex max-h-64 w-full max-w-[18rem] items-center justify-center overflow-hidden bg-[var(--surface)] [background-image:linear-gradient(45deg,var(--raised)_25%,transparent_25%),linear-gradient(-45deg,var(--raised)_25%,transparent_25%),linear-gradient(45deg,transparent_75%,var(--raised)_75%),linear-gradient(-45deg,transparent_75%,var(--raised)_75%)] [background-position:0_0,0_.5rem,.5rem_-.5rem,-.5rem_0] [background-size:1rem_1rem] [outline:1px_solid_oklch(0_0_0_/_0.1)]">
                   <img
-                    className="block h-full w-full object-contain [outline:1px_solid_oklch(0_0_0_/_0.1)]"
+                    className="max-h-64 max-w-full object-contain [outline:1px_solid_oklch(0_0_0_/_0.1)]"
                     src={previewUrl}
                     alt="Selected photo preview"
                   />
@@ -381,6 +410,32 @@ export function PhotoCompressorPage() {
                 <option>JPEG</option>
                 <option>PNG</option>
               </select>
+              {outputFormat === "PNG" ? (
+                <small className="text-[.75rem] leading-[1.45] text-[var(--signal)] [text-wrap:pretty]">
+                  PNG size can’t be reduced by quality. FormPack returns one PNG
+                  at your dimensions; if it misses the range, switch to JPEG or
+                  adjust the dimensions.
+                </small>
+              ) : null}
+            </label>
+
+            <label className="mt-5 flex min-w-0 flex-col gap-[.45rem]">
+              <span className="text-[.78rem] font-semibold text-[var(--muted)]">
+                Fit mode
+              </span>
+              <select
+                className="min-h-12 w-full rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-[.7rem] text-base text-[var(--ink)] outline-0 focus:border-[var(--focus)] focus:outline-2 focus:outline-[color-mix(in_oklch,var(--focus)_28%,transparent)] focus:outline-offset-0"
+                value={fit}
+                onChange={(event) => setFit(event.target.value as FitMode)}
+              >
+                <option value="cover">Crop to fill (recommended)</option>
+                <option value="contain">Fit inside (add borders)</option>
+                <option value="stretch">Stretch to exact dimensions</option>
+              </select>
+              <small className="text-[.75rem] leading-[1.45] text-[var(--muted)] [text-wrap:pretty]">
+                “Crop to fill” keeps the photo’s shape and fills the target
+                size. “Fit inside” shows the whole image with empty edges.
+              </small>
             </label>
 
             <div className="mt-6 grid gap-3 border-t border-[var(--border)] pt-5">
@@ -392,24 +447,27 @@ export function PhotoCompressorPage() {
                   ? error
                   : processing
                     ? "Preparing the result locally…"
-                    : formIsComplete
-                      ? "Ready to process this photo locally."
-                  : "Add a photo and complete every target field."}
+                    : result
+                      ? "Result ready below."
+                      : formIsComplete
+                        ? "Ready to process this photo locally."
+                        : "Add a photo and complete every target field."}
               </span>
               <button
-                className="inline-flex min-h-[3.25rem] w-full items-center justify-between gap-4 border border-[var(--ink)] bg-[var(--ink)] px-4 py-[.8rem] font-bold text-[var(--surface)] transition-[transform,background-color,opacity] duration-150 ease-out hover:bg-[var(--signal)] active:scale-[.96] disabled:cursor-not-allowed disabled:border-[var(--border)] disabled:bg-[var(--raised)] disabled:text-[var(--quiet)] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--focus)]"
+                className="inline-flex min-h-[3.25rem] w-full items-center justify-between gap-4 border border-[var(--signal)] bg-[var(--signal)] px-4 py-[.8rem] font-bold text-[var(--ink)] transition-[transform,background-color,opacity] duration-150 ease-out hover:bg-[var(--signal-hover)] active:scale-[.96] disabled:cursor-not-allowed disabled:border-[var(--border)] disabled:bg-[var(--raised)] disabled:text-[var(--quiet)] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--focus)]"
                 type="submit"
                 disabled={!formIsComplete || processing}
                 onClick={() => void handleCompress()}
               >
-                {processing ? "Processing…" : "Compress photo"} <ArrowRight size={16} aria-hidden="true" />
+                {processing ? "Processing…" : result ? "Compress again" : "Compress photo"} <ArrowRight size={16} aria-hidden="true" />
               </button>
             </div>
           </form>
         </div>
 
         <section
-          className="mt-[clamp(3rem,7vw,6rem)] border border-[var(--ink)] bg-[var(--surface)]"
+          ref={resultRef}
+          className="mt-[clamp(2rem,4vw,3rem)] border border-[var(--ink)] bg-[var(--surface)]"
           aria-labelledby="output-title"
         >
           <div className="flex items-end justify-between gap-8 border-b border-[var(--border)] p-5 max-[50rem]:flex-col max-[50rem]:items-start max-[50rem]:gap-4">
@@ -434,7 +492,7 @@ export function PhotoCompressorPage() {
             </div>
             <div className="grid content-center gap-5 bg-[var(--surface)] p-[clamp(1.25rem,3vw,2rem)]">
               {result ? <>
-                <div className={`border-b border-[var(--border-soft)] pb-5 ${result.inRange ? "" : "text-[var(--signal)]"}`}><span className="text-[.68rem] uppercase tracking-[.05em] text-[var(--quiet)] [font-family:var(--font-mono)]">Result status</span><p className="mt-[.45rem] text-[.9rem] font-[680] text-[var(--ink)]">{result.inRange ? "Inside the requested range" : "Closest achievable result"}</p><p className="mt-1 text-[.8rem] leading-[1.5] text-[var(--muted)]">{result.inRange ? "This file matches the dimensions and size range you entered." : "These dimensions and format could not reach the full range. Try adjusting the dimensions or maximum size."}</p></div>
+                <div className={`border-b border-[var(--border-soft)] pb-5 ${result.inRange ? "" : "text-[var(--signal)]"}`}><span className="text-[.68rem] uppercase tracking-[.05em] text-[var(--quiet)] [font-family:var(--font-mono)]">Result status</span><p className="mt-[.45rem] text-[.9rem] font-[680] text-[var(--ink)]">{result.inRange ? "Inside the requested range" : "Closest achievable result"}</p><p className="mt-1 text-[.8rem] leading-[1.5] text-[var(--muted)]">{result.inRange ? "This file matches the dimensions and size range you entered." : outputFormat === "PNG" ? "PNG has no quality control, so this best-effort file may not land inside the range. Switch to JPEG for exact range control." : "These dimensions and format could not reach the full range. Try adjusting the dimensions or maximum size."}</p></div>
                 <div className="grid grid-cols-2 gap-3 border-b border-[var(--border-soft)] pb-5"><div><span className="text-[.68rem] uppercase tracking-[.05em] text-[var(--quiet)] [font-family:var(--font-mono)]">Final size</span><strong className="mt-1 block text-[.9rem] [font-family:var(--font-mono)]">{formatBytes(result.blob.size)}</strong></div><div><span className="text-[.68rem] uppercase tracking-[.05em] text-[var(--quiet)] [font-family:var(--font-mono)]">Dimensions</span><strong className="mt-1 block text-[.9rem] [font-family:var(--font-mono)]">{result.width} × {result.height} px</strong></div></div>
                 <a href={result.url} download={`formpack-photo.${outputFormat === "PNG" ? "png" : "jpg"}`} className="flex min-h-12 items-center justify-center gap-2 border border-[var(--ink)] bg-[var(--ink)] px-4 py-3 text-[.82rem] font-[680] text-[var(--surface)] transition-[transform,background-color] duration-150 ease-out hover:bg-[var(--signal)] active:scale-[.96] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--focus)]"><Download size={17} strokeWidth={1.9} aria-hidden="true" /> Download result</a>
               </> : <>
@@ -460,6 +518,8 @@ export function PhotoCompressorPage() {
             </div>
           </div>
         </section>
+
+        <AdSlot slot={adSlots.toolBottom} className="mt-6" />
       </section>
     </>
   )
@@ -471,18 +531,45 @@ export function PdfCompressorPage() {
   const [maxKb, setMaxKb] = useState("")
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState("")
+  const [pageCount, setPageCount] = useState<number | null>(null)
   const [result, setResult] = useState<{
     blob: Blob
     url: string
     pageCount: number
     inRange: boolean
   } | null>(null)
+  const resultRef = useRef<HTMLElement | null>(null)
+
+  useEffect(() => {
+    if (!result) return
+    requestAnimationFrame(() => {
+      resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+    })
+  }, [result])
 
   useEffect(() => {
     return () => {
       if (result?.url) URL.revokeObjectURL(result.url)
     }
   }, [result?.url])
+
+  useEffect(() => {
+    if (!source) {
+      setPageCount(null)
+      return
+    }
+    let cancelled = false
+    readPdfPageCount(source)
+      .then((count) => {
+        if (!cancelled) setPageCount(count)
+      })
+      .catch(() => {
+        if (!cancelled) setPageCount(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [source])
 
   const onFile = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -507,14 +594,19 @@ export function PdfCompressorPage() {
     setProcessing(true)
     setError("")
     setResult(null)
+    track({ name: "tool_started", tool: "pdf-compressor" })
     try {
-      const processed = await rewritePdf(source)
+      const processed = await compressPdfToRange(source, minValue, maxValue)
       setResult({
-        ...processed,
+        blob: processed.blob,
+        pageCount: processed.pageCount,
+        inRange: processed.inRange,
         url: URL.createObjectURL(processed.blob),
-        inRange:
-          processed.blob.size >= minValue * 1024 &&
-          processed.blob.size <= maxValue * 1024,
+      })
+      track({
+        name: "tool_completed",
+        tool: "pdf-compressor",
+        inRange: processed.inRange,
       })
     } catch {
       setError("This PDF could not be read in the browser. Try an unlocked PDF with a valid page structure.")
@@ -552,6 +644,8 @@ export function PdfCompressorPage() {
             <PrivacyNotice compact />
           </div>
         </div>
+
+        <AdSlot slot={adSlots.toolTop} className="mb-6" />
 
         <div className="grid grid-cols-[minmax(0,1.08fr)_minmax(22rem,.92fr)] gap-px border border-[var(--border)] bg-[var(--border)] max-[50rem]:grid-cols-1">
           <section
@@ -631,7 +725,7 @@ export function PdfCompressorPage() {
                   Pages
                 </span>
                 <strong className="text-[.78rem] [font-family:var(--font-mono)] [font-variant-numeric:tabular-nums]">
-                  —
+                  {pageCount ?? "—"}
                 </strong>
               </div>
             </div>
@@ -718,8 +812,9 @@ export function PdfCompressorPage() {
                     Important before you compress
                   </strong>
                   <p className="mt-1 text-[.78rem] leading-[1.5] text-[var(--muted)] [text-wrap:pretty]">
-                    This pass rewrites the PDF locally. Selectable text may stay
-                    selectable, but image-heavy PDFs may not shrink much.
+                    This pass rasterizes the PDF locally. Selectable or
+                    searchable text becomes an image, so the file can shrink.
+                    Review the result for legibility before you submit it.
                   </p>
                 </div>
               </div>
@@ -734,24 +829,27 @@ export function PdfCompressorPage() {
                   ? error
                   : processing
                     ? "Preparing the PDF locally…"
-                    : formIsComplete
-                      ? "Ready to process this PDF locally."
-                  : "Add a PDF and complete the target range."}
+                    : result
+                      ? "Result ready below."
+                      : formIsComplete
+                        ? "Ready to process this PDF locally."
+                        : "Add a PDF and complete the target range."}
               </span>
               <button
-                className="inline-flex min-h-[3.25rem] w-full items-center justify-between gap-4 border border-[var(--ink)] bg-[var(--ink)] px-4 py-[.8rem] font-bold text-[var(--surface)] transition-[transform,background-color,opacity] duration-150 ease-out hover:bg-[var(--signal)] active:scale-[.96] disabled:cursor-not-allowed disabled:border-[var(--border)] disabled:bg-[var(--raised)] disabled:text-[var(--quiet)] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--focus)]"
+                className="inline-flex min-h-[3.25rem] w-full items-center justify-between gap-4 border border-[var(--signal)] bg-[var(--signal)] px-4 py-[.8rem] font-bold text-[var(--ink)] transition-[transform,background-color,opacity] duration-150 ease-out hover:bg-[var(--signal-hover)] active:scale-[.96] disabled:cursor-not-allowed disabled:border-[var(--border)] disabled:bg-[var(--raised)] disabled:text-[var(--quiet)] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--focus)]"
                 type="submit"
                 disabled={!formIsComplete || processing}
                 onClick={() => void handleCompress()}
               >
-                {processing ? "Processing…" : "Compress PDF"} <ArrowRight size={16} aria-hidden="true" />
+                {processing ? "Processing…" : result ? "Compress again" : "Compress PDF"} <ArrowRight size={16} aria-hidden="true" />
               </button>
             </div>
           </form>
         </div>
 
         <section
-          className="mt-[clamp(3rem,7vw,6rem)] border border-[var(--ink)] bg-[var(--surface)]"
+          ref={resultRef}
+          className="mt-[clamp(2rem,4vw,3rem)] border border-[var(--ink)] bg-[var(--surface)]"
           aria-labelledby="pdf-output-title"
         >
           <div className="flex items-end justify-between gap-8 border-b border-[var(--border)] p-5 max-[50rem]:flex-col max-[50rem]:items-start max-[50rem]:gap-4">
@@ -802,6 +900,8 @@ export function PdfCompressorPage() {
             </div>
           </div>
         </section>
+
+        <AdSlot slot={adSlots.toolBottom} className="mt-6" />
       </section>
     </>
   )
@@ -816,6 +916,14 @@ export function PhotoToPdfPage() {
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState("")
   const [result, setResult] = useState<{ blob: Blob; url: string; inRange: boolean } | null>(null)
+  const resultRef = useRef<HTMLElement | null>(null)
+
+  useEffect(() => {
+    if (!result) return
+    requestAnimationFrame(() => {
+      resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+    })
+  }, [result])
 
   useEffect(() => {
     return () => {
@@ -874,6 +982,7 @@ export function PhotoToPdfPage() {
     setProcessing(true)
     setError("")
     setResult(null)
+    track({ name: "tool_started", tool: "photo-to-pdf" })
     try {
       const hasRange = minKb.trim().length > 0 && maxKb.trim().length > 0
       const processed = await imagesToPdfRange(
@@ -883,6 +992,11 @@ export function PhotoToPdfPage() {
         hasRange ? maxValue : Number.MAX_SAFE_INTEGER / 1024,
       )
       setResult({ ...processed, url: URL.createObjectURL(processed.blob) })
+      track({
+        name: "tool_completed",
+        tool: "photo-to-pdf",
+        inRange: processed.inRange,
+      })
     } catch {
       setError("The images could not be combined in this browser. Try JPG or PNG files with valid image data.")
     } finally {
@@ -919,6 +1033,8 @@ export function PhotoToPdfPage() {
             <PrivacyNotice compact />
           </div>
         </div>
+
+        <AdSlot slot={adSlots.toolTop} className="mb-6" />
 
         <div className="grid grid-cols-[minmax(0,1.08fr)_minmax(22rem,.92fr)] gap-px border border-[var(--border)] bg-[var(--border)] max-[50rem]:grid-cols-1">
           <section
@@ -1139,21 +1255,23 @@ export function PhotoToPdfPage() {
                   ? error
                   : processing
                     ? "Building the PDF locally…"
-                    : formIsComplete
-                      ? "Ready to build the PDF locally."
-                  : images.length < 2
-                    ? "Add at least two images to continue."
-                    : rangeIsValid
-                      ? "Add an optional size range or continue."
-                      : "Set a valid minimum and maximum."}
+                    : result
+                      ? "Result ready below."
+                      : formIsComplete
+                        ? "Ready to build the PDF locally."
+                        : images.length < 2
+                          ? "Add at least two images to continue."
+                          : rangeIsValid
+                            ? "Add an optional size range or continue."
+                            : "Set a valid minimum and maximum."}
               </span>
               <button
-                className="inline-flex min-h-[3.25rem] w-full items-center justify-between gap-4 border border-[var(--ink)] bg-[var(--ink)] px-4 py-[.8rem] font-bold text-[var(--surface)] transition-[transform,background-color,opacity] duration-150 ease-out hover:bg-[var(--signal)] active:scale-[.96] disabled:cursor-not-allowed disabled:border-[var(--border)] disabled:bg-[var(--raised)] disabled:text-[var(--quiet)] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--focus)]"
+                className="inline-flex min-h-[3.25rem] w-full items-center justify-between gap-4 border border-[var(--signal)] bg-[var(--signal)] px-4 py-[.8rem] font-bold text-[var(--ink)] transition-[transform,background-color,opacity] duration-150 ease-out hover:bg-[var(--signal-hover)] active:scale-[.96] disabled:cursor-not-allowed disabled:border-[var(--border)] disabled:bg-[var(--raised)] disabled:text-[var(--quiet)] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--focus)]"
                 type="submit"
                 disabled={!formIsComplete || processing}
                 onClick={() => void handleCombine()}
               >
-                {processing ? "Building…" : "Combine & compress"}{" "}
+                {processing ? "Building…" : result ? "Build again" : "Combine & compress"}{" "}
                 <ArrowRight size={16} aria-hidden="true" />
               </button>
             </div>
@@ -1161,7 +1279,8 @@ export function PhotoToPdfPage() {
         </div>
 
         <section
-          className="mt-[clamp(3rem,7vw,6rem)] border border-[var(--ink)] bg-[var(--surface)]"
+          ref={resultRef}
+          className="mt-[clamp(2rem,4vw,3rem)] border border-[var(--ink)] bg-[var(--surface)]"
           aria-labelledby="photo-pdf-output-title"
         >
           <div className="flex items-end justify-between gap-8 border-b border-[var(--border)] p-5 max-[50rem]:flex-col max-[50rem]:items-start max-[50rem]:gap-4">
@@ -1212,6 +1331,8 @@ export function PhotoToPdfPage() {
             </div>
           </div>
         </section>
+
+        <AdSlot slot={adSlots.toolBottom} className="mt-6" />
       </section>
     </>
   )
@@ -1227,6 +1348,7 @@ export function ImageDimensionsPage() {
   const [targetWidth, setTargetWidth] = useState("")
   const [targetHeight, setTargetHeight] = useState("")
   const [outputFormat, setOutputFormat] = useState("Keep original")
+  const [fit, setFit] = useState<FitMode>("cover")
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState("")
   const [result, setResult] = useState<{
@@ -1298,7 +1420,7 @@ export function ImageDimensionsPage() {
             : source.type === "image/png"
               ? "PNG"
               : "JPEG"
-      const blob = await imageToBlob(source, width, height, format)
+      const blob = await imageToBlob(source, width, height, format, undefined, fit)
       setResult({
         blob,
         url: URL.createObjectURL(blob),
@@ -1372,9 +1494,9 @@ export function ImageDimensionsPage() {
                 className="absolute h-px w-px overflow-hidden opacity-0"
               />
               {source && previewUrl ? (
-                <span className="grid h-60 w-[min(100%,18rem)] place-items-center bg-[var(--surface)] [background-image:linear-gradient(45deg,var(--raised)_25%,transparent_25%),linear-gradient(-45deg,var(--raised)_25%,transparent_25%),linear-gradient(45deg,transparent_75%,var(--raised)_75%),linear-gradient(-45deg,transparent_75%,var(--raised)_75%)] [background-position:0_0,0_.5rem,.5rem_-.5rem,-.5rem_0] [background-size:1rem_1rem] [outline:1px_solid_oklch(0_0_0_/_0.1)]">
+                <span className="flex max-h-64 w-full max-w-[18rem] items-center justify-center overflow-hidden bg-[var(--surface)] [background-image:linear-gradient(45deg,var(--raised)_25%,transparent_25%),linear-gradient(-45deg,var(--raised)_25%,transparent_25%),linear-gradient(45deg,transparent_75%,var(--raised)_75%),linear-gradient(-45deg,transparent_75%,var(--raised)_75%)] [background-position:0_0,0_.5rem,.5rem_-.5rem,-.5rem_0] [background-size:1rem_1rem] [outline:1px_solid_oklch(0_0_0_/_0.1)]">
                   <img
-                    className="block h-full w-full object-contain [outline:1px_solid_oklch(0_0_0_/_0.1)]"
+                    className="max-h-64 max-w-full object-contain [outline:1px_solid_oklch(0_0_0_/_0.1)]"
                     src={previewUrl}
                     alt="Selected image preview"
                   />
@@ -1512,6 +1634,24 @@ export function ImageDimensionsPage() {
                 <option>PNG</option>
               </select>
             </label>
+            <label className="mt-5 flex min-w-0 flex-col gap-[.45rem]">
+              <span className="text-[.78rem] font-semibold text-[var(--muted)]">
+                Fit mode
+              </span>
+              <select
+                className="min-h-12 w-full rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-[.7rem] text-base text-[var(--ink)] outline-0 focus:border-[var(--focus)] focus:outline-2 focus:outline-[color-mix(in_oklch,var(--focus)_28%,transparent)] focus:outline-offset-0"
+                value={fit}
+                onChange={(event) => setFit(event.target.value as FitMode)}
+              >
+                <option value="cover">Crop to fill (recommended)</option>
+                <option value="contain">Fit inside (add borders)</option>
+                <option value="stretch">Stretch to exact dimensions</option>
+              </select>
+              <small className="text-[.75rem] leading-[1.45] text-[var(--muted)] [text-wrap:pretty]">
+                “Crop to fill” avoids stretching the image. Use “Stretch” only
+                when the portal expects the exact pixels regardless of shape.
+              </small>
+            </label>
             <div className="mt-6 grid gap-3 border-t border-[var(--border)] pt-5">
               <span
                 className="text-[.76rem] text-[var(--muted)] [text-wrap:pretty]"
@@ -1527,7 +1667,7 @@ export function ImageDimensionsPage() {
               <button
                 className={
                   formIsComplete && !processing
-                    ? "inline-flex min-h-[3.25rem] w-full items-center justify-between gap-4 border border-[var(--ink)] bg-[var(--ink)] px-4 py-[.8rem] font-bold text-[var(--surface)] transition-[transform,background-color] duration-150 ease-out hover:bg-[var(--signal)] active:scale-[.96] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--focus)]"
+                    ? "inline-flex min-h-[3.25rem] w-full items-center justify-between gap-4 border border-[var(--signal)] bg-[var(--signal)] px-4 py-[.8rem] font-bold text-[var(--ink)] transition-[transform,background-color] duration-150 ease-out hover:bg-[var(--signal-hover)] active:scale-[.96] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--focus)]"
                     : "inline-flex min-h-[3.25rem] w-full cursor-not-allowed items-center justify-between gap-4 border border-[var(--border)] bg-[var(--raised)] px-4 py-[.8rem] font-bold text-[var(--quiet)]"
                 }
                 type="submit"
@@ -1747,9 +1887,9 @@ export function SignaturePage() {
                 className="absolute h-px w-px overflow-hidden opacity-0"
               />
               {source && previewUrl ? (
-                <span className="grid h-60 w-[min(100%,18rem)] place-items-center bg-[var(--surface)] [background-image:linear-gradient(45deg,var(--raised)_25%,transparent_25%),linear-gradient(-45deg,var(--raised)_25%,transparent_25%),linear-gradient(45deg,transparent_75%,var(--raised)_75%),linear-gradient(-45deg,transparent_75%,var(--raised)_75%)] [background-position:0_0,0_.5rem,.5rem_-.5rem,-.5rem_0] [background-size:1rem_1rem] [outline:1px_solid_oklch(0_0_0_/_0.1)]">
+                <span className="flex max-h-64 w-full max-w-[18rem] items-center justify-center overflow-hidden bg-[var(--surface)] [background-image:linear-gradient(45deg,var(--raised)_25%,transparent_25%),linear-gradient(-45deg,var(--raised)_25%,transparent_25%),linear-gradient(45deg,transparent_75%,var(--raised)_75%),linear-gradient(-45deg,transparent_75%,var(--raised)_75%)] [background-position:0_0,0_.5rem,.5rem_-.5rem,-.5rem_0] [background-size:1rem_1rem] [outline:1px_solid_oklch(0_0_0_/_0.1)]">
                   <img
-                    className="block h-full w-full object-contain [outline:1px_solid_oklch(0_0_0_/_0.1)]"
+                    className="max-h-64 max-w-full object-contain [outline:1px_solid_oklch(0_0_0_/_0.1)]"
                     src={previewUrl}
                     alt="Selected signature preview"
                   />
@@ -1887,7 +2027,7 @@ export function SignaturePage() {
               <button
                 className={
                   source && !processing
-                    ? "inline-flex min-h-[3.25rem] w-full items-center justify-between gap-4 border border-[var(--ink)] bg-[var(--ink)] px-4 py-[.8rem] font-bold text-[var(--surface)] transition-[transform,background-color] duration-150 ease-out hover:bg-[var(--signal)] active:scale-[.96] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--focus)]"
+                    ? "inline-flex min-h-[3.25rem] w-full items-center justify-between gap-4 border border-[var(--signal)] bg-[var(--signal)] px-4 py-[.8rem] font-bold text-[var(--ink)] transition-[transform,background-color] duration-150 ease-out hover:bg-[var(--signal-hover)] active:scale-[.96] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--focus)]"
                     : "inline-flex min-h-[3.25rem] w-full cursor-not-allowed items-center justify-between gap-4 border border-[var(--border)] bg-[var(--raised)] px-4 py-[.8rem] font-bold text-[var(--quiet)]"
                 }
                 type="submit"
@@ -2000,7 +2140,7 @@ export function HomePage() {
           </p>
           <div className="home-hero-actions">
             <ActionLink to="/photo-compressor">Compress a photo</ActionLink>
-            <Link className="home-secondary-action" to="/quick-tools/pdf-size">
+            <Link className="home-secondary-action" to="/pdf-compressor">
               Start with a PDF <ArrowRight size={16} aria-hidden="true" />
             </Link>
           </div>
@@ -2125,7 +2265,7 @@ export function HomePage() {
               Open photo tool <ArrowRight size={15} aria-hidden="true" />
             </span>
           </Link>
-          <Link className="home-tool-card" to="/quick-tools/pdf-size">
+          <Link className="home-tool-card" to="/pdf-compressor">
             <span className="home-tool-label">PDF</span>
             <span className="home-tool-icon">
               <SlotIcon slot={{ kind: "pdf" }} />
@@ -3137,6 +3277,7 @@ export function DownloadPage() {
         new Blob([archive], { type: "application/zip" }),
       )
       setPackageUrl(nextUrl)
+      track({ name: "package_built", fileCount: readyFiles.length })
     } catch {
       setPackageError("The ZIP could not be built in this browser. Try selecting the files again.")
     } finally {
@@ -3481,16 +3622,89 @@ export function PrivacyPage() {
           <h2>Local processing</h2>
           <p>
             File analysis, image preparation, PDF preparation, and package
-            creation are intended to run in your browser. FormPack does not need
-            an account or cloud document storage for the core workflow.
+            creation run in your browser. FormPack does not need an account or
+            cloud document storage for the core workflow, and it does not
+            receive the files you add.
           </p>
         </section>
         <section>
           <h2>Aggregate product analytics</h2>
           <p>
-            Future analytics may count privacy-safe events such as a workflow
-            starting or finishing. Filenames, file contents, entered
-            requirements, and generated previews must not be included.
+            FormPack may count privacy-safe events such as a workflow starting
+            or finishing. Filenames, file contents, entered requirements, and
+            generated previews are never included.
+          </p>
+        </section>
+        <section>
+          <h2>Advertising and cookies</h2>
+          <p>
+            FormPack may show advertising served by Google AdSense. Google and
+            its partners may use cookies to serve ads based on prior visits to
+            this or other websites. You can opt out of personalised advertising
+            in Google’s Ads Settings, or use a tracking blocker to disable it.
+            Advertising does not have access to the files you process.
+          </p>
+        </section>
+      </article>
+    </PageFrame>
+  )
+}
+
+export function AboutPage() {
+  return (
+    <PageFrame
+      title="About FormPack"
+      intro="FormPack helps applicants turn a strict upload rule into a file that passes its measurable checks — without sending the file anywhere."
+    >
+      <article className="prose-page">
+        <section>
+          <h2>Why FormPack exists</h2>
+          <p>
+            Exam, job, visa, and admission portals reject files for reasons
+            software can measure: wrong format, wrong byte size, or wrong
+            dimensions. FormPack focuses on those measurable checks and leaves
+            visual judgment with the applicant.
+          </p>
+        </section>
+        <section>
+          <h2>Local-first by design</h2>
+          <p>
+            Photos and documents are sensitive. FormPack processes them in the
+            browser, so the file never has to be uploaded to a FormPack server.
+          </p>
+        </section>
+        <section>
+          <h2>What FormPack is not</h2>
+          <p>
+            FormPack cannot guarantee that a portal or authority will approve a
+            file. Always check the latest official instructions before you
+            submit.
+          </p>
+        </section>
+      </article>
+    </PageFrame>
+  )
+}
+
+export function ContactPage() {
+  return (
+    <PageFrame
+      title="Contact FormPack"
+      intro="Questions, corrections, or feedback about the tools and the guides."
+    >
+      <article className="prose-page">
+        <section>
+          <h2>Email</h2>
+          <p>
+            Reach the maintainer at{" "}
+            <a href="mailto:support@formpack.app">support@formpack.app</a>.
+          </p>
+        </section>
+        <section>
+          <h2>Do not send documents</h2>
+          <p>
+            Please do not attach application photos, signatures, or documents.
+            FormPack is a local tool and cannot inspect individual files.
           </p>
         </section>
       </article>

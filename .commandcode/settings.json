@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Shell(npm:*)",
+      "Shell(which bun npm 2>&1; echo \"---\"; bun --version 2>&1; npm --version 2>&1)",
+      "Shell(which convert magick rsvg-convert 2>&1; python3 -c \"import PIL; print('PIL', PIL.__version__)\" 2>&1; ls node_modules/@napi-rs 2>&1 | head)",
+      "Shell(python3 <<'PY' from PIL import Image, ImageDraw, ImageFont import os INK = (19, 33, 46, 255) CANVAS = (244, 242, 236, 255) ACCENT = (215, 87, 63, 255) def find_font(size, bold=True): candidates = [ \"/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf\", \"/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf\", \"/usr/share/fonts/TTF/DejaVuSans-Bold.ttf\", \"/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf\", ] for path in candidates: if os.path.exists(path): return ImageFont.truetype(path, size) return ImageFont.load_default() def draw_icon(size): img = Image.new(\"RGBA\", (size, size), (0, 0, 0, 0)) d = ImageDraw.Draw(img) radius = int(size * 0.16) d.rounded_rectangle([0, 0, size - 1, size - 1], radius=radius, fill=INK) font = find_font(int(size * 0.4)) text = \"FP\" bbox = d.textbbox((0, 0), text, font=font) w = bbox[2] - bbox[0] h = bbox[3] - bbox[1] d.text(((size - w) / 2 - bbox[0], (size - h) / 2 - bbox[1]), text, font=font, fill=CANVAS) return img draw_icon(192).save(\"public/icon-192.png\") draw_icon(512).save(\"public/icon-512.png\") # Social share image og = Image.new(\"RGBA\", (1200, 630), INK) d = ImageDraw.Draw(og) d.rectangle([0, 0, 1199, 12], fill=ACCENT) title_font = find_font(72) sub_font = find_font(30, bold=False) d.text((72, 200), \"FormPack\", font=title_font, fill=CANVAS) d.text((72, 330), \"Exact-size photo & PDF tools\", font=sub_font, fill=(244, 242, 236, 200)) d.text((72, 390), \"100% in your browser. No uploads.\", font=sub_font, fill=(244, 242, 236, 200)) og.convert(\"RGB\").save(\"public/og-image.png\", \"PNG\") print(\"generated icons and og-image\") PY)",
+      "Shell(rm:*)",
+      "Shell(ls:*)",
+      "Shell(agent-browser:*)",
+      "Shell(python3 -c \" from PIL import Image img = Image.new('RGB', (600, 800), (210, 87, 63)) img.save('/tmp/formpack-test-photo.png') print('created', img.size) \")",
+      "Shell(npx vite preview --port 4173 --strictPort)",
+      "Shell(export:*)",
+      "Shell(which chromium chromium-browser google-chrome google-chrome-stable chrome 2>&1; ls /usr/bin | grep -i chrom 2>&1 | head)"
+    ],
+    "deny": [],
+    "defaultMode": "default"
+  }
+}

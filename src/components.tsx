@@ -2,7 +2,6 @@ import { Link, Outlet, useRouterState } from "@tanstack/react-router"
 import {
   ArrowRight,
   Check,
-  FileCheck2,
   FileText,
   Image as ImageIcon,
   LockKeyhole,
@@ -20,6 +19,7 @@ import {
 } from "react"
 
 import { packSteps, type PackSlot, type SlotStatus } from "@/data"
+import { ADSENSE_CLIENT } from "@/lib/ads"
 import { pageMeta, SeoHead, type SeoMeta } from "@/seo"
 
 export function AppShell() {
@@ -43,6 +43,9 @@ export function AppShell() {
 
   return (
     <div className="site-shell">
+      <a className="skip-link" href="#main-content">
+        Skip to content
+      </a>
       <header className="site-header">
         <div className="shell-width header-inner">
           <Link to="/" className="wordmark" aria-label="FormPack home">
@@ -168,6 +171,8 @@ export function SiteFooter() {
         <nav aria-label="Footer navigation">
           <Link to="/fix">Fix a rejection</Link>
           <Link to="/guides">Guides</Link>
+          <Link to="/about">About</Link>
+          <Link to="/contact">Contact</Link>
           <Link to="/privacy">Privacy</Link>
           <Link to="/limitations">Limitations</Link>
         </nav>
@@ -286,64 +291,6 @@ export function SlotIcon({ slot }: { slot: Pick<PackSlot, "kind"> }) {
   return <ImageIcon size={20} strokeWidth={1.6} aria-hidden="true" />
 }
 
-export function ExamplePack() {
-  const rows = [
-    {
-      name: "Photo",
-      kind: "photo" as const,
-      spec: "JPG · under 200 KB · portrait",
-      status: "ready" as const,
-    },
-    {
-      name: "Signature",
-      kind: "signature" as const,
-      spec: "JPG · under 100 KB · 3:1",
-      status: "check" as const,
-    },
-    {
-      name: "Certificate PDF",
-      kind: "pdf" as const,
-      spec: "PDF · under 1 MB · up to 10 pages",
-      status: "not-started" as const,
-    },
-  ]
-
-  return (
-    <div className="example-pack" aria-label="Example application pack">
-      <div className="example-pack-head">
-        <div>
-          <span>Example application pack</span>
-          <strong>3 required files</strong>
-        </div>
-        <FileCheck2 size={26} strokeWidth={1.4} aria-hidden="true" />
-      </div>
-      <div className="example-meter" aria-hidden="true">
-        <span />
-        <span />
-        <span />
-      </div>
-      <div className="spec-rows">
-        {rows.map((row) => (
-          <div className="spec-row" key={row.name}>
-            <div className="slot-icon">
-              <SlotIcon slot={row} />
-            </div>
-            <div className="spec-row-copy">
-              <strong>{row.name}</strong>
-              <span>{row.spec}</span>
-            </div>
-            <StatusLabel status={row.status} />
-          </div>
-        ))}
-      </div>
-      <div className="example-pack-foot">
-        <span>1 mechanically ready</span>
-        <span>1 needs your review</span>
-      </div>
-    </div>
-  )
-}
-
 export function CheckLine({
   ready,
   children,
@@ -355,5 +302,42 @@ export function CheckLine({
       </span>
       {children}
     </li>
+  )
+}
+
+export function AdSlot({
+  slot,
+  className = "",
+}: {
+  slot: string
+  className?: string
+}) {
+  useEffect(() => {
+    if (!slot) return
+    try {
+      const adsWindow = window as unknown as { adsbygoogle?: unknown[] }
+      adsWindow.adsbygoogle = adsWindow.adsbygoogle ?? []
+      adsWindow.adsbygoogle.push({})
+    } catch {
+      // AdSense is unavailable (blocked, offline, or not yet configured).
+    }
+  }, [slot])
+
+  if (!slot) return null
+
+  return (
+    <div className={`min-h-[6.5rem] ${className}`.trim()} aria-label="Advertisement">
+      <span className="mb-1 block text-[.68rem] uppercase tracking-[.04em] text-[var(--quiet)] [font-family:var(--font-mono)]">
+        Advertisement
+      </span>
+      <ins
+        className="adsbygoogle"
+        style={{ display: "block" }}
+        data-ad-client={ADSENSE_CLIENT}
+        data-ad-slot={slot}
+        data-ad-format="auto"
+        data-full-width-responsive="true"
+      />
+    </div>
   )
 }

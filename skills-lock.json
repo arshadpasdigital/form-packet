@@ -396,6 +396,12 @@
       "skillPath": "interaction-design/skills/fitts-law/SKILL.md",
       "computedHash": "6e79798d5f6b731effde5055301127a173973da39da6b5746b9acfb2e7142aa3"
     },
+    "flux-kontext": {
+      "source": "prime-skills/runcomfy-agent-skills",
+      "sourceType": "github",
+      "skillPath": "flux-kontext/SKILL.md",
+      "computedHash": "f4bafaf65ed5f1da1defe05e40fbff2a244c1a69408e8b1727e54e746281aaea"
+    },
     "form-design": {
       "source": "owl-listener/designer-skills",
       "sourceType": "github",

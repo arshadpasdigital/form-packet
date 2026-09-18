@@ -106,7 +106,7 @@ export const quickTools = [
   {
     title: "Reduce image size",
     description: "Fit an image under a file-size limit.",
-    to: "/quick-tools/image-size",
+    to: "/photo-compressor",
   },
   {
     title: "Set image dimensions",
@@ -121,7 +121,12 @@ export const quickTools = [
   {
     title: "Reduce PDF size",
     description: "Fit a PDF under a portal limit.",
-    to: "/quick-tools/pdf-size",
+    to: "/pdf-compressor",
+  },
+  {
+    title: "Combine images into a PDF",
+    description: "Place photos, signatures, or thumb impressions in one PDF.",
+    to: "/photo-to-pdf",
   },
 ] as const
 
