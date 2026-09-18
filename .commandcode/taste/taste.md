@@ -1,0 +1,1 @@
+- Prefers to be shown/explained the correct approach and options before edits are applied directly. Confidence: 0.6
