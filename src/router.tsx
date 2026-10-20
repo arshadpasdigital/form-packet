@@ -8,12 +8,14 @@ import {
 import { AppShell } from "@/components"
 import {
   AboutPage,
+  BatchPage,
   CategoryPage,
   CheckPage,
   ContactPage,
   CookiesPage,
   DownloadPage,
   EditorialPage,
+  FileCheckerPage,
   FileWorkspacePage,
   FilesPage,
   FixPage,
@@ -25,6 +27,8 @@ import {
   PdfCompressorPage,
   PhotoCompressorPage,
   PhotoToPdfPage,
+  PresetPage,
+  PresetsPage,
   SignaturePage,
   ImageDimensionsPage,
   PrivacyPage,
@@ -143,6 +147,18 @@ const pdfCompressorRoute = createRoute({
   component: PdfCompressorPage,
 })
 
+const batchRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/batch",
+  component: BatchPage,
+})
+
+const fileCheckerRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/file-checker",
+  component: FileCheckerPage,
+})
+
 const photoToPdfRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/photo-to-pdf",
@@ -191,6 +207,18 @@ const contactRoute = createRoute({
   component: ContactPage,
 })
 
+const presetsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/presets",
+  component: PresetsPage,
+})
+
+const presetRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/presets/$slug",
+  component: PresetPage,
+})
+
 const guidesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/guides",
@@ -220,6 +248,8 @@ const routeTree = rootRoute.addChildren([
   imageDimensionsRoute,
   signatureRoute,
   pdfCompressorRoute,
+  batchRoute,
+  fileCheckerRoute,
   photoToPdfRoute,
   privacyRoute,
   limitationsRoute,
@@ -228,6 +258,8 @@ const routeTree = rootRoute.addChildren([
   cookiesRoute,
   aboutRoute,
   contactRoute,
+  presetsRoute,
+  presetRoute,
   guidesRoute,
   guideRoute,
 ])

@@ -46,6 +46,7 @@ export const seoGuides: SeoGuide[] = [
         paragraphs: [
           "JPEG is the usual choice for photographs because it compresses well and is accepted by most portals. PNG is useful for screenshots, signatures, and graphics with sharp edges, but it is often larger and does not have a quality slider.",
           "Portals may check the file's real content type rather than its extension. Renaming a PNG to .jpg does not convert it. If the rule says JPG, export a JPEG from an image editor or use a tool that writes a real JPEG file.",
+          "If you are using an iPhone, the camera may produce a HEIC/HEIF file. Many portals do not accept HEIC, so convert it to JPEG before uploading. FormPack converts HEIC locally in the browser; the original photo is not uploaded.",
         ],
       },
       {

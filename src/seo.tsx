@@ -66,7 +66,6 @@ export function SeoHead({
 
   useEffect(() => {
     document.title = title
-    document.documentElement.lang = "en"
     upsertMeta("name", "description", safeDescription)
     upsertMeta("name", "robots", robots)
     upsertMeta("property", "og:title", title)

@@ -1,6 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://formpack.app/</loc><lastmod>2026-10-20</lastmod></url>
+  <url><loc>https://formpack.app/presets</loc><lastmod>2026-10-20</lastmod></url>
+  <url><loc>https://formpack.app/presets/ssc-cgl</loc><lastmod>2026-10-20</lastmod></url>
+  <url><loc>https://formpack.app/presets/ssc-chsl</loc><lastmod>2026-10-20</lastmod></url>
+  <url><loc>https://formpack.app/presets/ssc-mts</loc><lastmod>2026-10-20</lastmod></url>
+  <url><loc>https://formpack.app/presets/ssc-gd</loc><lastmod>2026-10-20</lastmod></url>
+  <url><loc>https://formpack.app/presets/ibps-po</loc><lastmod>2026-10-20</lastmod></url>
+  <url><loc>https://formpack.app/presets/ibps-clerk</loc><lastmod>2026-10-20</lastmod></url>
+  <url><loc>https://formpack.app/presets/sbi-po</loc><lastmod>2026-10-20</lastmod></url>
+  <url><loc>https://formpack.app/presets/rrb-ntpc</loc><lastmod>2026-10-20</lastmod></url>
+  <url><loc>https://formpack.app/presets/rrb-group-d</loc><lastmod>2026-10-20</lastmod></url>
+  <url><loc>https://formpack.app/presets/rrb-alp</loc><lastmod>2026-10-20</lastmod></url>
+  <url><loc>https://formpack.app/presets/neet-ug</loc><lastmod>2026-10-20</lastmod></url>
+  <url><loc>https://formpack.app/presets/jee-main</loc><lastmod>2026-10-20</lastmod></url>
   <url><loc>https://formpack.app/guides</loc><lastmod>2026-10-20</lastmod></url>
   <url><loc>https://formpack.app/guides/photo-size-and-format-checklist</loc><lastmod>2026-10-20</lastmod></url>
   <url><loc>https://formpack.app/guides/signature-file-requirements</loc><lastmod>2026-10-20</lastmod></url>
@@ -23,6 +36,8 @@
   <url><loc>https://formpack.app/guides/upload-rejection-messages-explained</loc><lastmod>2026-10-20</lastmod></url>
   <url><loc>https://formpack.app/photo-compressor</loc><lastmod>2026-10-20</lastmod></url>
   <url><loc>https://formpack.app/pdf-compressor</loc><lastmod>2026-10-20</lastmod></url>
+  <url><loc>https://formpack.app/batch</loc><lastmod>2026-10-20</lastmod></url>
+  <url><loc>https://formpack.app/file-checker</loc><lastmod>2026-10-20</lastmod></url>
   <url><loc>https://formpack.app/photo-to-pdf</loc><lastmod>2026-10-20</lastmod></url>
   <url><loc>https://formpack.app/quick-tools/image-dimensions</loc><lastmod>2026-10-20</lastmod></url>
   <url><loc>https://formpack.app/quick-tools/signature</loc><lastmod>2026-10-20</lastmod></url>

@@ -4,6 +4,7 @@ import {
   Check,
   FileText,
   Image as ImageIcon,
+  Link2,
   LockKeyhole,
   Menu,
   PenLine,
@@ -25,10 +26,12 @@ import type {
   SourceLink,
 } from "@/content"
 import { packSteps, type PackSlot, type SlotStatus } from "@/data"
+import { LanguageSwitcher, useI18n } from "@/i18n"
 import { ADSENSE_CLIENT } from "@/lib/ads"
 import { pageMeta, SeoHead, type SeoMeta } from "@/seo"
 
 export function AppShell() {
+  const { t } = useI18n()
   const [menuOpen, setMenuOpen] = useState(false)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const pathname = useRouterState({
@@ -48,9 +51,9 @@ export function AppShell() {
   }, [menuOpen])
 
   return (
-    <div className="site-shell">
+    <div className="site-shell" id="top">
       <a className="skip-link" href="#main-content">
-        Skip to content
+        {t("skip")}
       </a>
       <header className="site-header">
         <div className="shell-width header-inner">
@@ -63,19 +66,25 @@ export function AppShell() {
 
           <nav className="desktop-nav" aria-label="Primary navigation">
             <Link to="/quick-tools" activeProps={{ "data-active": true }}>
-              Compress files
+              {t("nav.compress")}
+            </Link>
+            <Link to="/presets" activeProps={{ "data-active": true }}>
+              {t("nav.presets")}
             </Link>
             <Link to="/prepare" activeProps={{ "data-active": true }}>
-              Prepare a pack
+              {t("nav.prepare")}
             </Link>
             <Link to="/guides" activeProps={{ "data-active": true }}>
-              Guides
+              {t("nav.guides")}
             </Link>
           </nav>
 
-          <div className="header-privacy">
-            <LockKeyhole size={15} strokeWidth={1.8} aria-hidden="true" />
-            <span>Local processing</span>
+          <div className="header-actions">
+            <LanguageSwitcher className="header-language" />
+            <div className="header-privacy">
+              <LockKeyhole size={15} strokeWidth={1.8} aria-hidden="true" />
+              <span>{t("nav.localProcessing")}</span>
+            </div>
           </div>
 
           <button
@@ -102,22 +111,30 @@ export function AppShell() {
               activeProps={{ "data-active": true }}
               onClick={() => setMenuOpen(false)}
             >
-              Compress files
+              {t("nav.compress")}
+            </Link>
+            <Link
+              to="/presets"
+              activeProps={{ "data-active": true }}
+              onClick={() => setMenuOpen(false)}
+            >
+              {t("nav.presets")}
             </Link>
             <Link
               to="/prepare"
               activeProps={{ "data-active": true }}
               onClick={() => setMenuOpen(false)}
             >
-              Prepare a pack
+              {t("nav.prepare")}
             </Link>
             <Link
               to="/guides"
               activeProps={{ "data-active": true }}
               onClick={() => setMenuOpen(false)}
             >
-              Read file guides
+              {t("nav.mobileGuides")}
             </Link>
+            <LanguageSwitcher className="mobile-language" />
           </nav>
         ) : null}
       </header>
@@ -167,28 +184,49 @@ export function PackStepRail() {
 }
 
 export function SiteFooter() {
+  const { t } = useI18n()
+
   return (
     <footer className="site-footer">
-      <div className="shell-width footer-grid">
-        <div>
+      <div className="shell-width footer-main">
+        <div className="footer-brand">
           <span className="footer-name">FormPack</span>
-          <p>Private file preparation for strict application forms.</p>
+          <p>{t("footer.tagline")}</p>
         </div>
-        <nav aria-label="Footer navigation">
-          <Link to="/fix">Fix a rejection</Link>
-          <Link to="/guides">Guides</Link>
-          <Link to="/about">About</Link>
-          <Link to="/contact">Contact</Link>
-          <Link to="/privacy">Privacy</Link>
-          <Link to="/cookies">Cookies</Link>
-          <Link to="/terms">Terms</Link>
-          <Link to="/editorial">Editorial</Link>
-          <Link to="/limitations">Limitations</Link>
+
+        <nav className="footer-group" aria-label={t("footer.tools")}>
+          <h2 className="footer-heading">{t("footer.tools")}</h2>
+          <Link to="/fix">{t("footer.fix")}</Link>
+          <Link to="/batch">{t("footer.batch")}</Link>
+          <Link to="/file-checker">{t("footer.checker")}</Link>
+          <Link to="/presets">{t("footer.presets")}</Link>
         </nav>
-        <p className="footer-note">
-          FormPack checks file rules. It cannot guarantee approval by a portal
-          or authority. Always confirm the current official instructions.
+
+        <nav className="footer-group" aria-label={t("footer.learn")}>
+          <h2 className="footer-heading">{t("footer.learn")}</h2>
+          <Link to="/guides">{t("footer.guides")}</Link>
+          <Link to="/about">{t("footer.about")}</Link>
+          <Link to="/editorial">{t("footer.editorial")}</Link>
+          <Link to="/contact">{t("footer.contact")}</Link>
+        </nav>
+
+        <nav className="footer-group" aria-label={t("footer.legal")}>
+          <h2 className="footer-heading">{t("footer.legal")}</h2>
+          <Link to="/privacy">{t("footer.privacy")}</Link>
+          <Link to="/cookies">{t("footer.cookies")}</Link>
+          <Link to="/terms">{t("footer.terms")}</Link>
+          <Link to="/limitations">{t("footer.limitations")}</Link>
+        </nav>
+      </div>
+
+      <div className="shell-width footer-bottom">
+        <p className="footer-copy" dir="ltr">
+          © {new Date().getFullYear()} FormPack
         </p>
+        <p className="footer-note">{t("footer.note")}</p>
+        <a className="footer-top" href="#top">
+          {t("footer.backToTop")} ↑
+        </a>
       </div>
     </footer>
   )
@@ -237,6 +275,8 @@ export function ArticleBody({
   faqs?: Faq[]
   sources?: SourceLink[]
 }) {
+  const { t } = useI18n()
+
   return (
     <>
       {sections.map((section) => (
@@ -256,7 +296,7 @@ export function ArticleBody({
       ))}
       {faqs?.length ? (
         <section>
-          <h2>Frequently asked questions</h2>
+          <h2>{t("article.faq")}</h2>
           {faqs.map((faq) => (
             <div className="faq-item" key={faq.question}>
               <h3>{faq.question}</h3>
@@ -267,7 +307,7 @@ export function ArticleBody({
       ) : null}
       {sources?.length ? (
         <section>
-          <h2>Sources and further reading</h2>
+          <h2>{t("article.sources")}</h2>
           <ul>
             {sources.map((source) => (
               <li key={source.url}>
@@ -336,17 +376,60 @@ export function ActionLink({
 }
 
 export function PrivacyNotice({ compact = false }: { compact?: boolean }) {
+  const { t } = useI18n()
+
   return (
     <div className={compact ? "privacy-notice is-compact" : "privacy-notice"}>
       <ShieldCheck size={22} strokeWidth={1.6} aria-hidden="true" />
       <div>
-        <strong>Files stay on this device</strong>
-        <span>
-          FormPack processes them in your browser and never uploads your
-          documents.
-        </span>
+        <strong>{t("privacy.title")}</strong>
+        <span>{t("privacy.body")}</span>
       </div>
     </div>
+  )
+}
+
+export function RuleLinkButton({
+  href,
+  label = "Copy rule link",
+  className = "",
+}: {
+  href: string
+  label?: string
+  className?: string
+}) {
+  const [copied, setCopied] = useState(false)
+
+  const shareOrCopy = async () => {
+    const url = new URL(href, window.location.origin).toString()
+
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "FormPack rule", url })
+        return
+      }
+    } catch {
+      // Fall through to clipboard when the share sheet is unavailable or cancelled.
+    }
+
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 2000)
+    } catch {
+      window.prompt("Copy this rule link", url)
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      className={`rule-link-button ${className}`.trim()}
+      onClick={() => void shareOrCopy()}
+    >
+      <Link2 size={15} strokeWidth={1.9} aria-hidden="true" />
+      {copied ? "Link copied" : label}
+    </button>
   )
 }
 

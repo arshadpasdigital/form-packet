@@ -12,6 +12,11 @@ import {
   type Faq,
   type SourceLink,
 } from "../src/content"
+import {
+  examPresets,
+  presetFieldHref,
+  type ExamPreset,
+} from "../src/exam-presets"
 import { seoGuides, type SeoGuide } from "../src/seo-data"
 
 type StaticPage = {
@@ -143,15 +148,16 @@ function sourcesHtml(sources?: SourceLink[]) {
 }
 
 function staticHeader() {
-  return `<header class="site-header"><div class="shell-width header-inner"><a class="wordmark" href="/" aria-label="FormPack home"><span class="wordmark-mark" aria-hidden="true">FP</span><span>FormPack</span></a><nav class="desktop-nav" aria-label="Primary navigation"><a href="/quick-tools">Compress files</a><a href="/prepare">Prepare a pack</a><a href="/guides">Guides</a></nav></div></header>`
+  return `<header class="site-header"><div class="shell-width header-inner"><a class="wordmark" href="/" aria-label="FormPack home"><span class="wordmark-mark" aria-hidden="true">FP</span><span>FormPack</span></a><nav class="desktop-nav" aria-label="Primary navigation"><a href="/quick-tools">Compress files</a><a href="/presets">Exam presets</a><a href="/prepare">Prepare a pack</a><a href="/guides">Guides</a></nav></div></header>`
 }
 
 function staticFooter() {
-  return `<footer class="site-footer"><div class="shell-width footer-grid"><div><span class="footer-name">FormPack</span><p>Private file preparation for strict application forms.</p></div><nav aria-label="Footer navigation"><a href="/fix">Fix a rejection</a><a href="/guides">Guides</a><a href="/about">About</a><a href="/contact">Contact</a><a href="/privacy">Privacy</a><a href="/cookies">Cookies</a><a href="/terms">Terms</a><a href="/editorial">Editorial</a><a href="/limitations">Limitations</a></nav><p class="footer-note">FormPack checks file rules. It cannot guarantee approval by a portal or authority.</p></div></footer>`
+  const year = new Date().getFullYear()
+  return `<footer class="site-footer"><div class="shell-width footer-main"><div class="footer-brand"><span class="footer-name">FormPack</span><p>Private file preparation for strict application forms.</p></div><nav class="footer-group" aria-label="Tools"><h2 class="footer-heading">Tools</h2><a href="/fix">Fix a rejection</a><a href="/batch">Batch compress</a><a href="/file-checker">Check a file</a><a href="/presets">Exam presets</a></nav><nav class="footer-group" aria-label="Learn"><h2 class="footer-heading">Learn</h2><a href="/guides">Guides</a><a href="/about">About</a><a href="/editorial">Editorial</a><a href="/contact">Contact</a></nav><nav class="footer-group" aria-label="Legal"><h2 class="footer-heading">Legal</h2><a href="/privacy">Privacy</a><a href="/cookies">Cookies</a><a href="/terms">Terms</a><a href="/limitations">Limitations</a></nav></div><div class="shell-width footer-bottom"><p class="footer-copy" dir="ltr">© ${year} FormPack</p><p class="footer-note">FormPack checks file rules. It cannot guarantee approval by a portal or authority. Always confirm the current official instructions.</p><a class="footer-top" href="#top">Back to top ↑</a></div></footer>`
 }
 
 function staticShell(body: string) {
-  return `<div class="site-shell">${staticHeader()}${body}${staticFooter()}</div>`
+  return `<div class="site-shell" id="top">${staticHeader()}${body}${staticFooter()}</div>`
 }
 
 function articleBodyHtml(content: ArticleContent) {
@@ -184,7 +190,7 @@ function homeBody() {
       formatDate(homeContent.updatedAt)
     )}</span></div><h1>Hit the exact size range.</h1>${articleBodyHtml(
       homeContent
-    )}<p><a href="/photo-compressor">Compress a photo</a> · <a href="/pdf-compressor">Compress a PDF</a> · <a href="/photo-to-pdf">Combine images into a PDF</a> · <a href="/quick-tools/image-dimensions">Resize an image</a> · <a href="/guides">Read the guides</a></p></article></main>`
+    )}<p><a href="/presets">Browse exam presets</a> · <a href="/photo-compressor">Compress a photo</a> · <a href="/pdf-compressor">Compress a PDF</a> · <a href="/photo-to-pdf">Combine images into a PDF</a> · <a href="/quick-tools/image-dimensions">Resize an image</a> · <a href="/guides">Read the guides</a></p></article></main>`
   )
 }
 
@@ -217,6 +223,100 @@ function guideIndexBody() {
   return staticShell(
     `<main id="main-content" class="page-frame shell-width"><article class="guide-article"><h1>Application file checklists and guides</h1><p>Plain-language checklists for turning an official upload rule into measurable checks and a final human review. Each guide explains what software can measure, what you still need to inspect, and which official source to use.</p><ul>${items}</ul><p><a href="/photo-compressor">Compress a photo</a> · <a href="/pdf-compressor">Compress a PDF</a> · <a href="/photo-to-pdf">Combine images into a PDF</a></p></article></main>`
   )
+}
+
+function presetIndexBody() {
+  const items = examPresets
+    .map(
+      (preset) =>
+        `<li><a href="/presets/${escapeHtml(preset.slug)}">${escapeHtml(
+          preset.exam
+        )}</a> — ${escapeHtml(preset.summary)}<ul>${preset.fields
+          .map(
+            (field) =>
+              `<li><strong>${escapeHtml(field.label)}:</strong> ${field.format} · ${field.minKb}–${field.maxKb} KB · ${escapeHtml(field.dimensionsLabel)}</li>`
+          )
+          .join("")}</ul></li>`
+    )
+    .join("")
+  return staticShell(
+    `<main id="main-content" class="page-frame shell-width"><article class="guide-article"><h1>Exam file presets</h1><p>Start with the photo, signature, thumb impression, and declaration values commonly published for your exam. These presets are a preparation reference, not an official approval. Confirm every value against the current official notice.</p><ul>${items}</ul><p><a href="/photo-compressor">Compress a photo</a> · <a href="/pdf-compressor">Compress a PDF</a> · <a href="/guides">Read the guides</a></p></article></main>`
+  )
+}
+
+function presetBody(preset: ExamPreset) {
+  const rows = preset.fields
+    .map(
+      (field) =>
+        `<tr><td><strong>${escapeHtml(field.label)}</strong>${
+          field.notes ? `<small>${escapeHtml(field.notes)}</small>` : ""
+        }</td><td>${field.format}</td><td>${field.minKb}–${field.maxKb} KB</td><td>${escapeHtml(
+          field.dimensionsLabel
+        )}</td><td><a href="${escapeHtml(presetFieldHref(preset, field))}">Open tool →</a></td></tr>`
+    )
+    .join("")
+  const steps = `<ol>${preset.steps
+    .map((step) => `<li>${escapeHtml(step)}</li>`)
+    .join("")}</ol>`
+  const notes = `<ul>${preset.notes
+    .map((note) => `<li>${escapeHtml(note)}</li>`)
+    .join("")}</ul>`
+  const guide = preset.guideSlug
+    ? `<p><a href="/guides/${escapeHtml(preset.guideSlug)}">Read the full preparation guide →</a></p>`
+    : ""
+  const meta = `<div class="guide-article-meta"><span>${escapeHtml(
+    preset.authority
+  )}</span><span>${escapeHtml(preset.cycle)}</span><span>Last updated ${escapeHtml(
+    formatDate(preset.updatedAt)
+  )}</span></div>`
+  return staticShell(
+    `<main id="main-content" class="page-frame shell-width"><article class="guide-article">${meta}<h1>${escapeHtml(
+      preset.exam
+    )} photo and signature requirements</h1><p>${escapeHtml(
+      preset.summary
+    )}</p><section><h2>Upload rules</h2><div class="preset-table-wrap"><table class="preset-table"><thead><tr><th>Field</th><th>Format</th><th>Size</th><th>Dimensions</th><th>Prepare</th></tr></thead><tbody>${rows}</tbody></table></div></section><section><h2>How to prepare the files</h2>${steps}</section><section><h2>Important notes</h2>${notes}</section><section><h2>Official source</h2><p><a href="${escapeHtml(
+      preset.source.url
+    )}" rel="noopener noreferrer">${escapeHtml(
+      preset.source.label
+    )}</a></p>${guide}</section><p><a href="/presets">Browse all exam presets</a> · <a href="/photo-compressor">Open the photo tool</a> · <a href="/guides">Read the guides</a></p></article></main>`
+  )
+}
+
+function presetSchema(preset: ExamPreset, siteUrl: string) {
+  return {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Article",
+        headline: `${preset.exam} photo and signature requirements`,
+        description: preset.summary,
+        url: `${siteUrl}/presets/${preset.slug}`,
+        datePublished: preset.updatedAt,
+        dateModified: preset.updatedAt,
+        author: { "@type": "Organization", name: SITE.author },
+        publisher: { "@type": "Organization", name: SITE.name, url: siteUrl },
+        isPartOf: { "@type": "WebSite", name: SITE.name, url: siteUrl },
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Home", item: siteUrl },
+          {
+            "@type": "ListItem",
+            position: 2,
+            name: "Exam presets",
+            item: `${siteUrl}/presets`,
+          },
+          {
+            "@type": "ListItem",
+            position: 3,
+            name: preset.exam,
+            item: `${siteUrl}/presets/${preset.slug}`,
+          },
+        ],
+      },
+    ],
+  }
 }
 
 function toolBody(pathName: string) {
@@ -352,6 +452,27 @@ export function generateStaticSeoPages(root = process.cwd()) {
       body: homeBody(),
       jsonLd: homeSchema(siteUrl),
     },
+    {
+      pathName: "/presets",
+      title: "Exam photo and signature presets | FormPack",
+      description:
+        "Browse exam-specific photo, signature, thumb impression, and declaration rules for SSC, IBPS, SBI, RRB, NTA, and other applications.",
+      body: presetIndexBody(),
+      jsonLd: {
+        "@context": "https://schema.org",
+        "@type": "CollectionPage",
+        name: "Exam file presets",
+        url: `${siteUrl}/presets`,
+      },
+    },
+    ...examPresets.map((preset) => ({
+      pathName: `/presets/${preset.slug}`,
+      title: `${preset.exam} photo and signature requirements | FormPack`,
+      description: preset.summary,
+      body: presetBody(preset),
+      type: "article" as const,
+      jsonLd: presetSchema(preset, siteUrl),
+    })),
     {
       pathName: "/guides",
       title: "Application file checklists and guides | FormPack",

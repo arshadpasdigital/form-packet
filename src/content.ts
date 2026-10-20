@@ -65,7 +65,7 @@ export const homeContent: ArticleContent = {
     {
       heading: "What you can do with FormPack",
       bullets: [
-        "Compress a JPG or PNG photo into a minimum and maximum KB range while keeping the dimensions you enter.",
+        "Compress a JPG, PNG, or HEIC photo into a minimum and maximum KB range while keeping the dimensions you enter.",
         "Compress a PDF into a target size range when a portal rejects a scan for being too large.",
         "Combine a photo, signature, and thumb impression into one ordered PDF.",
         "Resize an image to exact pixel dimensions when a portal publishes width and height requirements.",
@@ -153,7 +153,7 @@ export const toolContent: Record<string, ArticleContent> = {
   "/photo-compressor": {
     title: "Photo compressor",
     description:
-      "Compress a JPG or PNG photo to the exact file-size range required by an exam or application portal. Files stay in your browser.",
+      "Compress a JPG, PNG, or HEIC photo to the exact file-size range required by an exam or application portal. HEIC files are converted locally. Files stay in your browser.",
     intro: [
       "The photo compressor is for application photos that must land inside a specific KB window. You provide the target minimum and maximum, the pixel dimensions, and the output format. FormPack resizes the image and adjusts quality until the file fits the range, or returns the closest achievable result with an explanation.",
       "This page explains how the tool behaves, which rules it can measure, and how to recover when a portal rejects a photo for a reason the file size alone does not explain.",
@@ -179,7 +179,7 @@ export const toolContent: Record<string, ArticleContent> = {
         heading: "How to use the tool",
         bullets: [
           "Copy the format, minimum size, maximum size, and pixel dimensions from the official form.",
-          "Add one JPG or PNG. The tool shows the original size and dimensions.",
+          "Add one JPG, PNG, or HEIC. The tool shows the original size and dimensions; HEIC is converted to JPEG locally.",
           "Enter the minimum and maximum KB values and the exact width and height.",
           "Choose JPEG unless the portal explicitly requires PNG.",
           "Run the compression, check the reported status, and download the result.",
@@ -227,6 +227,11 @@ export const toolContent: Record<string, ArticleContent> = {
         question: "Does the photo leave my device?",
         answer:
           "No. The resize and compression loop runs in your browser. The original file and the result stay on your device.",
+      },
+      {
+        question: "Does FormPack accept HEIC or HEIF photos?",
+        answer:
+          "Yes. An iPhone HEIC/HEIF photo is converted to JPEG locally before compression. The conversion happens in your browser, so the original photo is not uploaded.",
       },
       {
         question: "Why does the tool ask for dimensions as well as file size?",
@@ -608,6 +613,198 @@ export const toolContent: Record<string, ArticleContent> = {
         question: "Can I set an exact file size?",
         answer:
           "Use the photo compressor for an exact KB range. The signature tool focuses on crop and clarity.",
+      },
+    ],
+    sources: [
+      {
+        label: "MDN: Image file type and format guide",
+        url: "https://developer.mozilla.org/en-US/docs/Web/Media/Formats/Image_types",
+      },
+    ],
+    updatedAt: SITE.updatedAt,
+  },
+  "/batch": {
+    title: "Batch photo compressor",
+    description:
+      "Compress multiple JPG, PNG, WebP, or HEIC images to an exact KB range in one local batch.",
+    intro: [
+      "The batch compressor applies one size and dimension rule to several images at once. It is for coaching centers, cyber cafes, families, and anyone preparing more than one application on the same device.",
+      "Every file is processed in your browser with the same local worker used by the single-photo compressor. You can download each result separately or build one ZIP.",
+    ],
+    sections: [
+      {
+        heading: "What the batch tool does",
+        paragraphs: [
+          "Select multiple images, enter the minimum and maximum file size, and choose whether to resize them to exact dimensions. The tool processes each file in sequence and reports the final size and whether it landed inside the range.",
+          "If you leave the width and height empty, each image keeps its original dimensions. That is useful when the portal only enforces a KB limit and does not publish a pixel rule.",
+        ],
+      },
+      {
+        heading: "When to use a batch",
+        bullets: [
+          "Several applicants need the same photo or signature rule.",
+          "A coaching center or cyber cafe is preparing files for a group.",
+          "You have multiple scans that need the same PDF or image limit.",
+          "You want one ZIP instead of downloading files one by one.",
+        ],
+      },
+      {
+        heading: "How to use the batch compressor",
+        bullets: [
+          "Open the batch tool and choose multiple JPG, PNG, WebP, or HEIC images.",
+          "Enter the minimum and maximum KB values from the official form.",
+          "Optionally enter the exact width and height for every output.",
+          "Choose JPEG unless the portal requires PNG.",
+          "Run the batch and review each file's status and final size.",
+          "Download individual results or build one ZIP.",
+        ],
+      },
+      {
+        heading: "Dimensions and ranges",
+        paragraphs: [
+          "A batch uses one rule for every file. If the images have different shapes, a fixed width and height can crop some of them more than others. Use the crop-to-fill mode for photos and fit-inside only when nothing may be cut off.",
+          "If the range cannot be reached for a file, the tool returns the closest result and marks it. A very small image may not have enough detail to reach a large KB target, and a very large image may not compress below a tight maximum without losing legibility.",
+        ],
+      },
+      {
+        heading: "What the batch tool cannot check",
+        paragraphs: [
+          "The batch tool measures format, size, and dimensions. It does not detect faces, judge backgrounds, or compare each image with a portal's visual example. Those checks still need human review.",
+          "Always keep the originals until the portal confirms the upload. A batch result is a prepared copy, not an official approval.",
+        ],
+      },
+      {
+        heading: "Troubleshooting",
+        bullets: [
+          "If a file fails, remove it and try a JPG or PNG copy.",
+          "If the result is below the minimum, raise the dimensions or use a higher-quality source.",
+          "If the result is above the maximum, lower the dimensions before lowering quality.",
+          "If PNG misses the range, switch the batch to JPEG.",
+          "If the browser runs out of memory, process fewer files at a time.",
+        ],
+      },
+    ],
+    faqs: [
+      {
+        question: "Do the batch files leave my device?",
+        answer:
+          "No. Every image is processed locally in the browser. The ZIP is assembled on the device as well.",
+      },
+      {
+        question: "Can I use different rules for different files?",
+        answer:
+          "The batch applies one rule to all selected files. Use the single-photo compressor when each file needs a different range or dimension.",
+      },
+      {
+        question: "Does the batch accept HEIC photos?",
+        answer:
+          "Yes. HEIC/HEIF files are converted to JPEG locally before the batch rule is applied. The original files stay on your device.",
+      },
+      {
+        question: "Can I keep the original dimensions?",
+        answer:
+          "Yes. Leave the width and height fields empty and each image keeps its own dimensions.",
+      },
+      {
+        question: "Why did one file fail?",
+        answer:
+          "The browser may not be able to decode the file, or the file may be corrupt. Remove it and try a JPG or PNG copy.",
+      },
+      {
+        question: "How many files can I process?",
+        answer:
+          "It depends on the device's memory. Start with 10–20 photos on a budget phone and add more if the browser stays responsive.",
+      },
+      {
+        question: "Is the ZIP uploaded anywhere?",
+        answer:
+          "No. The ZIP is built in the browser with the files you already processed locally.",
+      },
+    ],
+    sources: [
+      {
+        label: "MDN: Image file type and format guide",
+        url: "https://developer.mozilla.org/en-US/docs/Web/Media/Formats/Image_types",
+      },
+      {
+        label: "web.dev: Compress images",
+        url: "https://web.dev/articles/compress-images",
+      },
+    ],
+    updatedAt: SITE.updatedAt,
+  },
+  "/file-checker": {
+    title: "File pass checker",
+    description:
+      "Check a photo, signature, or PDF against an upload rule locally before you submit it.",
+    intro: [
+      "The file pass checker measures one file against the rule you enter. It reports whether the format, file size, dimensions, and PDF page count match, and it flags the parts you still need to review yourself.",
+      "The check runs in your browser. The file is not uploaded, and the result is a measurement, not a guarantee that a portal will approve it.",
+    ],
+    sections: [
+      {
+        heading: "What the checker measures",
+        bullets: [
+          "The file's real format, such as JPEG, PNG, or PDF.",
+          "The file size in KB, including a minimum and maximum range.",
+          "Pixel dimensions for an image.",
+          "The page count for a PDF, compared with a maximum.",
+          "The filename and extension, if you compare them manually.",
+        ],
+      },
+      {
+        heading: "How to use the checker",
+        bullets: [
+          "Load an exam preset or enter the rule from the official form.",
+          "Add one photo, signature, HEIC image, or PDF.",
+          "Run the check and review each measured row.",
+          "Use the linked compressor if the file misses a rule.",
+          "Complete the visual review before uploading to the portal.",
+        ],
+      },
+      {
+        heading: "Measured pass is not official approval",
+        paragraphs: [
+          "A file can pass every measurable check and still be rejected. Face position, background colour, lighting, signature legibility, document seals, and portal-specific examples require human judgment.",
+          "Use the checker as a fast pre-flight test. It tells you whether the mechanical parts are right; it does not replace the official instructions.",
+        ],
+      },
+      {
+        heading: "Troubleshooting",
+        bullets: [
+          "If the file cannot be read, try a JPG or PNG copy, or an unlocked PDF.",
+          "If the size fails, use the photo or PDF compressor to reach the range.",
+          "If the dimensions fail, use the image dimensions tool.",
+          "If a HEIC file is rejected by the portal, convert it to JPEG locally first.",
+          "If the page count is too high, check whether the portal allows separate uploads.",
+        ],
+      },
+    ],
+    faqs: [
+      {
+        question: "Does the file leave my device?",
+        answer:
+          "No. The checker reads the file locally in your browser. The file is not uploaded.",
+      },
+      {
+        question: "Does a passing result guarantee approval?",
+        answer:
+          "No. It means the measured properties match the rule you entered. The portal may apply visual or manual checks that the tool cannot see.",
+      },
+      {
+        question: "Can I check a HEIC photo?",
+        answer:
+          "Yes. A HEIC/HEIF file is converted to JPEG locally before the dimensions and size are checked.",
+      },
+      {
+        question: "Can I check a PDF?",
+        answer:
+          "Yes. The checker can measure the PDF size and page count. Use the PDF compressor if it exceeds a limit.",
+      },
+      {
+        question: "Why is the filename check manual?",
+        answer:
+          "The checker shows the file you selected, but the portal's exact filename pattern is a separate rule. Compare it with the instruction before uploading.",
       },
     ],
     sources: [

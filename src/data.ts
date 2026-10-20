@@ -128,6 +128,16 @@ export const quickTools = [
     description: "Place photos, signatures, or thumb impressions in one PDF.",
     to: "/photo-to-pdf",
   },
+  {
+    title: "Batch compress photos",
+    description: "Apply one size rule to many images and download a ZIP.",
+    to: "/batch",
+  },
+  {
+    title: "Check a file against a rule",
+    description: "Measure a file before you upload it.",
+    to: "/file-checker",
+  },
 ] as const
 
 const acceptedMimeTypes: Record<string, string[]> = {

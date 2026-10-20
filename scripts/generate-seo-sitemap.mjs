@@ -12,12 +12,23 @@ const source = fs.readFileSync(
 const slugs = [...source.matchAll(/slug:\s*"([^"]+)"/g)].map(
   (match) => match[1]
 )
+const presetSource = fs.readFileSync(
+  new URL("../src/exam-presets.ts", import.meta.url),
+  "utf8"
+)
+const presetSlugs = [...presetSource.matchAll(/slug:\s*"([^"]+)"/g)].map(
+  (match) => match[1]
+)
 const paths = [
   "/",
+  "/presets",
+  ...presetSlugs.map((slug) => `/presets/${slug}`),
   "/guides",
   ...slugs.map((slug) => `/guides/${slug}`),
   "/photo-compressor",
   "/pdf-compressor",
+  "/batch",
+  "/file-checker",
   "/photo-to-pdf",
   "/quick-tools/image-dimensions",
   "/quick-tools/signature",

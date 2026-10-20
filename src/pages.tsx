@@ -35,6 +35,7 @@ import {
   CheckLine,
   PageFrame,
   PrivacyNotice,
+  RuleLinkButton,
   SlotIcon,
   StatusLabel,
 } from "@/components"
@@ -47,6 +48,13 @@ import {
   type ArticleContent,
 } from "@/content"
 import {
+  examPresets,
+  getExamPreset,
+  presetFieldHref,
+  type ExamPreset,
+} from "@/exam-presets"
+import { useI18n } from "@/i18n"
+import {
   categories,
   fileTypeMatches,
   formatBytes,
@@ -57,6 +65,7 @@ import { usePack } from "@/pack-store"
 import { useFix } from "@/fix-store"
 import { adSlots } from "@/lib/ads"
 import { track } from "@/lib/analytics"
+import { normalizeImageFile, normalizeImageFiles } from "@/lib/heic"
 import {
   compressImageToRange,
   compressPdfToRange,
@@ -70,20 +79,68 @@ import {
 import { SeoHead, SITE_URL } from "@/seo"
 import { getSeoGuide, seoGuides } from "@/seo-data"
 
+function buildRuleQuery(values: Record<string, string | undefined>) {
+  const params = new URLSearchParams()
+  for (const [key, value] of Object.entries(values)) {
+    if (value) params.set(key, value)
+  }
+  return params.toString()
+}
+
 export function PhotoCompressorPage() {
+  const { t } = useI18n()
+  const initialSearch = new URLSearchParams(window.location.search)
+  const searchMin = initialSearch.get("min") ?? ""
+  const searchMax = initialSearch.get("max") ?? ""
+  const searchWidth = initialSearch.get("w") ?? ""
+  const searchHeight = initialSearch.get("h") ?? ""
+  const searchFormat = initialSearch.get("format")
+  const searchFit = initialSearch.get("fit")
+  const presetSlug = initialSearch.get("preset") ?? undefined
+  const preset = presetSlug ? getExamPreset(presetSlug) : undefined
+
   const [source, setSource] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState("")
   const [sourceDimensions, setSourceDimensions] = useState<{
     width: number
     height: number
   } | null>(null)
-  const [minKb, setMinKb] = useState("")
-  const [maxKb, setMaxKb] = useState("")
-  const [targetWidth, setTargetWidth] = useState("")
-  const [targetHeight, setTargetHeight] = useState("")
-  const [outputFormat, setOutputFormat] = useState<"JPEG" | "PNG">("JPEG")
-  const [fit, setFit] = useState<FitMode>("cover")
+  const [minKb, setMinKb] = useState(searchMin)
+  const [maxKb, setMaxKb] = useState(searchMax)
+  const [targetWidth, setTargetWidth] = useState(searchWidth)
+  const [targetHeight, setTargetHeight] = useState(searchHeight)
+  const [outputFormat, setOutputFormat] = useState<"JPEG" | "PNG">(
+    searchFormat === "PNG" ? "PNG" : "JPEG",
+  )
+  const [fit, setFit] = useState<FitMode>(
+    searchFit === "contain" || searchFit === "stretch" ? searchFit : "cover",
+  )
+
+  useEffect(() => {
+    if (searchMin) setMinKb(searchMin)
+    if (searchMax) setMaxKb(searchMax)
+    if (searchWidth) setTargetWidth(searchWidth)
+    if (searchHeight) setTargetHeight(searchHeight)
+    if (searchFormat === "PNG" || searchFormat === "JPEG") {
+      setOutputFormat(searchFormat)
+    }
+    if (
+      searchFit === "cover" ||
+      searchFit === "contain" ||
+      searchFit === "stretch"
+    ) {
+      setFit(searchFit)
+    }
+  }, [
+    searchMin,
+    searchMax,
+    searchWidth,
+    searchHeight,
+    searchFormat,
+    searchFit,
+  ])
   const [processing, setProcessing] = useState(false)
+  const [converting, setConverting] = useState(false)
   const [error, setError] = useState("")
   const [result, setResult] = useState<{
     blob: Blob
@@ -125,12 +182,18 @@ export function PhotoCompressorPage() {
     }
   }, [source])
 
-  const onFile = (event: ChangeEvent<HTMLInputElement>) => {
+  const onFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (file) {
-      setSource(file)
-      setResult(null)
-      setError("")
+    if (!file) return
+    setConverting(true)
+    setResult(null)
+    setError("")
+    try {
+      setSource(await normalizeImageFile(file))
+    } catch {
+      setError("The HEIC photo could not be converted. Try a JPG or PNG copy.")
+    } finally {
+      setConverting(false)
     }
   }
 
@@ -195,15 +258,23 @@ export function PhotoCompressorPage() {
           <div>
             <div className="inline-flex items-center gap-[.55rem] text-[.68rem] uppercase tracking-[.05em] text-[var(--quiet)] [font-family:var(--font-mono)]">
               <span className="home-kicker-dot" aria-hidden="true" />
-              Photo compressor / local processing
+              {t("photo.kicker")}
             </div>
             <h1 className="my-4 max-w-[10ch] text-[clamp(3.2rem,7vw,6rem)] font-[680] leading-[.9] tracking-[-.075em] [text-wrap:balance]">
-              Put your photo inside the portal’s range.
+              {t("photo.title")}
             </h1>
             <p className="mt-6 max-w-[58ch] text-[1.05rem] text-[var(--muted)] [text-wrap:pretty]">
-              Copy the exact KB and pixel rules from the form. FormPack will use
-              them to prepare one JPG or PNG on this device.
+              {t("photo.intro")}
             </p>
+            {preset ? (
+              <p className="preset-loaded">
+                {t("photo.loadedFrom")}{" "}
+                <Link to="/presets/$slug" params={{ slug: preset.slug }}>
+                  {preset.exam}
+                </Link>
+                . {t("photo.confirm")}
+              </p>
+            ) : null}
           </div>
           <div className="max-[50rem]:max-w-none">
             <PrivacyNotice compact />
@@ -221,7 +292,7 @@ export function PhotoCompressorPage() {
               className="text-[.68rem] uppercase tracking-[.05em] text-[var(--quiet)] [font-family:var(--font-mono)]"
               id="source-title"
             >
-              01 / Add your photo
+              {t("photo.add")}
             </div>
             <label
               className={
@@ -232,7 +303,7 @@ export function PhotoCompressorPage() {
             >
               <input
                 type="file"
-                accept="image/jpeg,image/png"
+                accept="image/jpeg,image/png,.heic,.heif,image/heic,image/heif"
                 onChange={onFile}
                 className="absolute h-px w-px overflow-hidden opacity-0"
               />
@@ -248,15 +319,15 @@ export function PhotoCompressorPage() {
                 <span className="flex flex-col items-center gap-[.6rem] [&>svg]:mb-2 [&>svg]:h-11 [&>svg]:w-11 [&>svg]:text-[var(--proof)] [&>svg]:[stroke-width:1.8]">
                   <SlotIcon slot={{ kind: "photo" }} />
                   <strong className="text-[1.08rem] tracking-[-.02em]">
-                    Choose a JPG or PNG
+                    {t("photo.choose")}
                   </strong>
                   <small className="max-w-[28ch] text-[.82rem] text-[var(--muted)] [text-wrap:pretty]">
-                    Use your camera, gallery, or device storage.
+                    {t("photo.chooseHint")}
                   </small>
                 </span>
               )}
               <span className="inline-flex min-h-11 items-center gap-[.45rem] border border-[var(--ink)] bg-[var(--surface)] px-[.85rem] py-[.65rem] text-[.82rem] font-bold text-[var(--ink)]">
-                {source ? "Choose another photo" : "Choose a photo"}
+                {source ? t("photo.chooseAnother") : t("photo.choosePhoto")}
                 <ArrowRight size={15} aria-hidden="true" />
               </span>
             </label>
@@ -267,15 +338,15 @@ export function PhotoCompressorPage() {
             >
               <div className="flex min-w-0 flex-col gap-[.35rem]">
                 <span className="text-[.68rem] uppercase tracking-[.05em] text-[var(--quiet)] [font-family:var(--font-mono)]">
-                  Source file
+                  {t("photo.sourceFile")}
                 </span>
                 <strong className="[overflow-wrap:anywhere] text-[.78rem] [font-family:var(--font-mono)] [font-variant-numeric:tabular-nums]">
-                  {source?.name ?? "No photo selected"}
+                  {source?.name ?? t("photo.noPhoto")}
                 </strong>
               </div>
               <div className="flex min-w-0 flex-col gap-[.35rem]">
                 <span className="text-[.68rem] uppercase tracking-[.05em] text-[var(--quiet)] [font-family:var(--font-mono)]">
-                  Current size
+                  {t("photo.currentSize")}
                 </span>
                 <strong className="[overflow-wrap:anywhere] text-[.78rem] [font-family:var(--font-mono)] [font-variant-numeric:tabular-nums]">
                   {source ? formatBytes(source.size) : "—"}
@@ -283,7 +354,7 @@ export function PhotoCompressorPage() {
               </div>
               <div className="flex min-w-0 flex-col gap-[.35rem]">
                 <span className="text-[.68rem] uppercase tracking-[.05em] text-[var(--quiet)] [font-family:var(--font-mono)]">
-                  Dimensions
+                  {t("photo.dimensions")}
                 </span>
                 <strong className="[overflow-wrap:anywhere] text-[.78rem] [font-family:var(--font-mono)] [font-variant-numeric:tabular-nums]">
                   {sourceDimensions
@@ -299,25 +370,25 @@ export function PhotoCompressorPage() {
             onSubmit={(event) => event.preventDefault()}
           >
             <div className="text-[.68rem] uppercase tracking-[.05em] text-[var(--quiet)] [font-family:var(--font-mono)]">
-              02 / Copy the portal rule
+              {t("photo.rule")}
             </div>
             <div className="mt-4 border-b border-[var(--border)] pb-5">
               <h2 className="m-0 text-[1.45rem] leading-[1.1] tracking-[-.035em]">
-                Exact output settings
+                {t("photo.settings")}
               </h2>
               <p className="mt-[.45rem] text-[.86rem] text-[var(--muted)]">
-                Use the values printed beside the upload field.
+                {t("photo.settingsHint")}
               </p>
             </div>
 
             <fieldset className="mt-5 border-0 p-0">
               <legend className="text-[.78rem] font-semibold text-[var(--muted)]">
-                Target file size
+                {t("photo.targetSize")}
               </legend>
               <div className="mt-[.55rem] grid grid-cols-2 gap-3">
                 <label className="flex min-w-0 flex-col gap-[.45rem]">
                   <span className="text-[.78rem] font-semibold text-[var(--muted)]">
-                    Minimum
+                    {t("photo.min")}
                   </span>
                   <div className="grid grid-cols-[minmax(0,1fr)_auto]">
                     <input
@@ -337,7 +408,7 @@ export function PhotoCompressorPage() {
                 </label>
                 <label className="flex min-w-0 flex-col gap-[.45rem]">
                   <span className="text-[.78rem] font-semibold text-[var(--muted)]">
-                    Maximum
+                    {t("photo.max")}
                   </span>
                   <div className="grid grid-cols-[minmax(0,1fr)_auto]">
                     <input
@@ -364,12 +435,12 @@ export function PhotoCompressorPage() {
 
             <fieldset className="mt-5 border-0 p-0">
               <legend className="text-[.78rem] font-semibold text-[var(--muted)]">
-                Target dimensions
+                {t("photo.targetDimensions")}
               </legend>
               <div className="mt-[.55rem] grid grid-cols-2 gap-3">
                 <label className="flex min-w-0 flex-col gap-[.45rem]">
                   <span className="text-[.78rem] font-semibold text-[var(--muted)]">
-                    Width
+                    {t("photo.width")}
                   </span>
                   <div className="grid grid-cols-[minmax(0,1fr)_auto]">
                     <input
@@ -388,7 +459,7 @@ export function PhotoCompressorPage() {
                 </label>
                 <label className="flex min-w-0 flex-col gap-[.45rem]">
                   <span className="text-[.78rem] font-semibold text-[var(--muted)]">
-                    Height
+                    {t("photo.height")}
                   </span>
                   <div className="grid grid-cols-[minmax(0,1fr)_auto]">
                     <input
@@ -410,7 +481,7 @@ export function PhotoCompressorPage() {
 
             <label className="mt-5 flex min-w-0 flex-col gap-[.45rem]">
               <span className="text-[.78rem] font-semibold text-[var(--muted)]">
-                Output format
+                {t("photo.format")}
               </span>
               <select
                 className="min-h-12 w-full rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-[.7rem] text-base text-[var(--ink)] outline-0 focus:border-[var(--focus)] focus:outline-2 focus:outline-[color-mix(in_oklch,var(--focus)_28%,transparent)] focus:outline-offset-0"
@@ -431,7 +502,7 @@ export function PhotoCompressorPage() {
 
             <label className="mt-5 flex min-w-0 flex-col gap-[.45rem]">
               <span className="text-[.78rem] font-semibold text-[var(--muted)]">
-                Fit mode
+                {t("photo.fit")}
               </span>
               <select
                 className="min-h-12 w-full rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-[.7rem] text-base text-[var(--ink)] outline-0 focus:border-[var(--focus)] focus:outline-2 focus:outline-[color-mix(in_oklch,var(--focus)_28%,transparent)] focus:outline-offset-0"
@@ -448,20 +519,38 @@ export function PhotoCompressorPage() {
               </small>
             </label>
 
+            {rangeIsValid ? (
+              <RuleLinkButton
+                className="mt-4"
+                href={`/photo-compressor?${buildRuleQuery({
+                  min: minKb,
+                  max: maxKb,
+                  w: targetWidth,
+                  h: targetHeight,
+                  format: outputFormat,
+                  fit,
+                  preset: presetSlug,
+                })}`}
+                label={t("photo.share")}
+              />
+            ) : null}
+
             <div className="mt-6 grid gap-3 border-t border-[var(--border)] pt-5">
               <span
                 className="text-[.76rem] text-[var(--muted)] [text-wrap:pretty]"
                 role="status"
               >
-                {error
-                  ? error
-                  : processing
-                    ? "Preparing the result locally…"
+                {converting
+                  ? t("photo.converting")
+                  : error
+                    ? error
+                    : processing
+                      ? t("photo.preparing")
                     : result
-                      ? "Result ready below."
+                      ? t("photo.resultReady")
                       : formIsComplete
-                        ? "Ready to process this photo locally."
-                        : "Add a photo and complete every target field."}
+                        ? t("photo.ready")
+                        : t("photo.complete")}
               </span>
               <button
                 className="inline-flex min-h-[3.25rem] w-full items-center justify-between gap-4 border border-[var(--signal)] bg-[var(--signal)] px-4 py-[.8rem] font-bold text-[var(--ink)] transition-[transform,background-color,opacity] duration-150 ease-out hover:bg-[var(--signal-hover)] active:scale-[.96] disabled:cursor-not-allowed disabled:border-[var(--border)] disabled:bg-[var(--raised)] disabled:text-[var(--quiet)] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--focus)]"
@@ -469,7 +558,12 @@ export function PhotoCompressorPage() {
                 disabled={!formIsComplete || processing}
                 onClick={() => void handleCompress()}
               >
-                {processing ? "Processing…" : result ? "Compress again" : "Compress photo"} <ArrowRight size={16} aria-hidden="true" />
+                {processing
+                  ? t("photo.processing")
+                  : result
+                    ? t("photo.compressAgain")
+                    : t("photo.compress")}{" "}
+                <ArrowRight size={16} aria-hidden="true" />
               </button>
             </div>
           </form>
@@ -483,28 +577,32 @@ export function PhotoCompressorPage() {
           <div className="flex items-end justify-between gap-8 border-b border-[var(--border)] p-5 max-[50rem]:flex-col max-[50rem]:items-start max-[50rem]:gap-4">
             <div>
               <div className="text-[.68rem] uppercase tracking-[.05em] text-[var(--quiet)] [font-family:var(--font-mono)]">
-                03 / Check the result
+                {t("photo.check")}
               </div>
               <h2
                 className="mt-[.65rem] text-[1.45rem] leading-[1.1] tracking-[-.035em]"
                 id="output-title"
               >
-                Your in-range file will appear here.
+                {t("photo.waiting")}
               </h2>
             </div>
             <span className={`whitespace-nowrap text-[.68rem] uppercase tracking-[.05em] [font-family:var(--font-mono)] max-[50rem]:whitespace-normal ${result?.inRange ? "text-[var(--ready)]" : "text-[var(--proof)]"}`}>
-              {result ? (result.inRange ? "In range" : "Closest result") : "Waiting for output"}
+              {result
+                ? result.inRange
+                  ? t("photo.inRange")
+                  : t("photo.closest")
+                : t("photo.waitingOutput")}
             </span>
           </div>
           <div className="grid grid-cols-[minmax(0,1.1fr)_minmax(18rem,.9fr)] gap-px bg-[var(--border)] max-[50rem]:grid-cols-1">
             <div className="flex min-h-[17rem] flex-col items-center justify-center bg-[var(--canvas)] p-[clamp(1.25rem,3vw,2rem)] text-center [&>svg]:mb-4 [&>svg]:h-11 [&>svg]:w-11 [&>svg]:text-[var(--proof)] [&>svg]:[stroke-width:1.8]">
-              {result ? <img src={result.url} alt="Compressed photo preview" className="max-h-64 max-w-[18rem] rounded border border-[var(--border)] bg-white object-contain [outline:1px_solid_oklch(0_0_0_/_0.1)]" /> : <><SlotIcon slot={{ kind: "photo" }} /><strong className="text-[1.05rem]">Result preview</strong><p className="mt-2 max-w-[34ch] text-[.82rem] text-[var(--muted)] [text-wrap:pretty]">Run the local pass to compare the finished file with your portal rule.</p></>}
+              {result ? <img src={result.url} alt="Compressed photo preview" className="max-h-64 max-w-[18rem] rounded border border-[var(--border)] bg-white object-contain [outline:1px_solid_oklch(0_0_0_/_0.1)]" /> : <><SlotIcon slot={{ kind: "photo" }} /><strong className="text-[1.05rem]">{t("photo.resultPreview")}</strong><p className="mt-2 max-w-[34ch] text-[.82rem] text-[var(--muted)] [text-wrap:pretty]">{t("photo.resultPreviewBody")}</p></>}
             </div>
             <div className="grid content-center gap-5 bg-[var(--surface)] p-[clamp(1.25rem,3vw,2rem)]">
               {result ? <>
                 <div className={`border-b border-[var(--border-soft)] pb-5 ${result.inRange ? "" : "text-[var(--signal)]"}`}><span className="text-[.68rem] uppercase tracking-[.05em] text-[var(--quiet)] [font-family:var(--font-mono)]">Result status</span><p className="mt-[.45rem] text-[.9rem] font-[680] text-[var(--ink)]">{result.inRange ? "Inside the requested range" : "Closest achievable result"}</p><p className="mt-1 text-[.8rem] leading-[1.5] text-[var(--muted)]">{result.inRange ? "This file matches the dimensions and size range you entered." : outputFormat === "PNG" ? "PNG has no quality control, so this best-effort file may not land inside the range. Switch to JPEG for exact range control." : "These dimensions and format could not reach the full range. Try adjusting the dimensions or maximum size."}</p></div>
                 <div className="grid grid-cols-2 gap-3 border-b border-[var(--border-soft)] pb-5"><div><span className="text-[.68rem] uppercase tracking-[.05em] text-[var(--quiet)] [font-family:var(--font-mono)]">Final size</span><strong className="mt-1 block text-[.9rem] [font-family:var(--font-mono)]">{formatBytes(result.blob.size)}</strong></div><div><span className="text-[.68rem] uppercase tracking-[.05em] text-[var(--quiet)] [font-family:var(--font-mono)]">Dimensions</span><strong className="mt-1 block text-[.9rem] [font-family:var(--font-mono)]">{result.width} × {result.height} px</strong></div></div>
-                <a href={result.url} download={`formpack-photo.${outputFormat === "PNG" ? "png" : "jpg"}`} className="flex min-h-12 items-center justify-center gap-2 border border-[var(--ink)] bg-[var(--ink)] px-4 py-3 text-[.82rem] font-[680] text-[var(--surface)] transition-[transform,background-color] duration-150 ease-out hover:bg-[var(--signal)] active:scale-[.96] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--focus)]"><Download size={17} strokeWidth={1.9} aria-hidden="true" /> Download result</a>
+                <a href={result.url} download={`formpack-photo.${outputFormat === "PNG" ? "png" : "jpg"}`} className="flex min-h-12 items-center justify-center gap-2 border border-[var(--ink)] bg-[var(--ink)] px-4 py-3 text-[.82rem] font-[680] text-[var(--surface)] transition-[transform,background-color] duration-150 ease-out hover:bg-[var(--signal)] active:scale-[.96] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--focus)]"><Download size={17} strokeWidth={1.9} aria-hidden="true" /> {t("photo.downloadResult")}</a>
               </> : <>
               <div className="border-b border-[var(--border-soft)] pb-5 last:border-b-0 last:pb-0">
                 <span className="text-[.68rem] uppercase tracking-[.05em] text-[var(--quiet)] [font-family:var(--font-mono)]">
@@ -540,10 +638,1098 @@ export function PhotoCompressorPage() {
   )
 }
 
+type BatchItem = {
+  id: string
+  file: File
+  width: number
+  height: number
+  status: "ready" | "processing" | "done" | "error"
+  result?: {
+    blob: Blob
+    url: string
+    inRange: boolean
+    width: number
+    height: number
+  }
+  error?: string
+}
+
+function batchId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID()
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
+
+function uniqueOutputName(
+  name: string,
+  format: "JPEG" | "PNG",
+  used: Set<string>,
+) {
+  const base = name.replace(/\.[^.]+$/, "") || "image"
+  const extension = format === "PNG" ? "png" : "jpg"
+  let candidate = `${base}.${extension}`
+  let copy = 2
+  while (used.has(candidate)) {
+    candidate = `${base}-${copy}.${extension}`
+    copy += 1
+  }
+  used.add(candidate)
+  return candidate
+}
+
+export function BatchPage() {
+  const { t } = useI18n()
+  const initialSearch = new URLSearchParams(window.location.search)
+  const searchMin = initialSearch.get("min") ?? ""
+  const searchMax = initialSearch.get("max") ?? ""
+  const searchWidth = initialSearch.get("w") ?? ""
+  const searchHeight = initialSearch.get("h") ?? ""
+  const searchFormat = initialSearch.get("format")
+  const searchFit = initialSearch.get("fit")
+
+  const [items, setItems] = useState<BatchItem[]>([])
+  const [minKb, setMinKb] = useState(searchMin)
+  const [maxKb, setMaxKb] = useState(searchMax)
+  const [targetWidth, setTargetWidth] = useState(searchWidth)
+  const [targetHeight, setTargetHeight] = useState(searchHeight)
+  const [outputFormat, setOutputFormat] = useState<"JPEG" | "PNG">(
+    searchFormat === "PNG" ? "PNG" : "JPEG",
+  )
+  const [fit, setFit] = useState<FitMode>(
+    searchFit === "contain" || searchFit === "stretch" ? searchFit : "cover",
+  )
+  const [processing, setProcessing] = useState(false)
+  const [converting, setConverting] = useState(false)
+  const [zipUrl, setZipUrl] = useState("")
+  const itemsRef = useRef(items)
+  itemsRef.current = items
+
+  useEffect(() => {
+    return () => {
+      for (const item of itemsRef.current) {
+        if (item.result?.url) URL.revokeObjectURL(item.result.url)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (zipUrl) URL.revokeObjectURL(zipUrl)
+    }
+  }, [zipUrl])
+
+  const minValue = Number(minKb)
+  const maxValue = Number(maxKb)
+  const rangeIsValid =
+    minKb.trim().length > 0 &&
+    maxKb.trim().length > 0 &&
+    minValue > 0 &&
+    maxValue >= minValue
+  const dimensionsAreValid =
+    (targetWidth.trim().length === 0 && targetHeight.trim().length === 0) ||
+    (Number(targetWidth) > 0 && Number(targetHeight) > 0)
+  const canCompress =
+    items.length > 0 &&
+    rangeIsValid &&
+    dimensionsAreValid &&
+    !processing &&
+    !converting
+  const doneCount = items.filter((item) => item.status === "done").length
+  const inRangeCount = items.filter((item) => item.result?.inRange).length
+  const totalInputBytes = items.reduce((sum, item) => sum + item.file.size, 0)
+  const totalOutputBytes = items.reduce(
+    (sum, item) => sum + (item.result?.blob.size ?? 0),
+    0,
+  )
+
+  const addFiles = async (event: ChangeEvent<HTMLInputElement>) => {
+    const rawFiles = Array.from(event.target.files ?? [])
+    event.target.value = ""
+    if (!rawFiles.length) return
+
+    setConverting(true)
+    try {
+      const nextItems = await Promise.all(
+        rawFiles.map(async (rawFile) => {
+          let file = rawFile
+          try {
+            file = await normalizeImageFile(rawFile)
+          } catch {
+            // Keep the original so the per-file error is visible.
+          }
+          let width = 0
+          let height = 0
+          try {
+            const bitmap = await createImageBitmap(file)
+            width = bitmap.width
+            height = bitmap.height
+            bitmap.close()
+          } catch {
+            // Dimensions are optional; the file can still be compressed to a KB range.
+          }
+          return {
+            id: batchId(),
+            file,
+            width,
+            height,
+            status: "ready" as const,
+          }
+        }),
+      )
+
+      setItems((current) => [...current, ...nextItems])
+      setZipUrl("")
+    } finally {
+      setConverting(false)
+    }
+  }
+
+  const removeItem = (id: string) => {
+    setItems((current) => {
+      const item = current.find((entry) => entry.id === id)
+      if (item?.result?.url) URL.revokeObjectURL(item.result.url)
+      return current.filter((entry) => entry.id !== id)
+    })
+    setZipUrl("")
+  }
+
+  const compressAll = async () => {
+    if (!canCompress) return
+    setProcessing(true)
+    setZipUrl("")
+    const width = Number(targetWidth) || 0
+    const height = Number(targetHeight) || 0
+
+    for (const item of items) {
+      setItems((current) =>
+        current.map((entry) =>
+          entry.id === item.id
+            ? { ...entry, status: "processing", error: undefined }
+            : entry,
+        ),
+      )
+      try {
+        const itemWidth = width || item.width
+        const itemHeight = height || item.height
+        if (!itemWidth || !itemHeight) {
+          throw new Error("The image dimensions could not be read.")
+        }
+        const processed = await compressImageToRange(
+          item.file,
+          itemWidth,
+          itemHeight,
+          outputFormat,
+          minValue,
+          maxValue,
+          fit,
+        )
+        const url = URL.createObjectURL(processed.blob)
+        setItems((current) =>
+          current.map((entry) =>
+            entry.id === item.id
+              ? {
+                  ...entry,
+                  status: "done",
+                  result: {
+                    blob: processed.blob,
+                    url,
+                    inRange: processed.inRange,
+                    width: processed.width,
+                    height: processed.height,
+                  },
+                }
+              : entry,
+          ),
+        )
+      } catch (error) {
+        setItems((current) =>
+          current.map((entry) =>
+            entry.id === item.id
+              ? {
+                  ...entry,
+                  status: "error",
+                  error:
+                    error instanceof Error ? error.message : t("batch.error"),
+                }
+              : entry,
+          ),
+        )
+      }
+    }
+    setProcessing(false)
+  }
+
+  const downloadZip = async () => {
+    const completed = items.filter((item) => item.result)
+    if (!completed.length) return
+    const used = new Set<string>()
+    const entries: Record<string, Uint8Array> = {}
+    for (const item of completed) {
+      if (!item.result) continue
+      entries[uniqueOutputName(item.file.name, outputFormat, used)] =
+        new Uint8Array(await item.result.blob.arrayBuffer())
+    }
+    const archive = zipSync(entries, { level: 6 })
+    setZipUrl(
+      URL.createObjectURL(new Blob([archive], { type: "application/zip" })),
+    )
+  }
+
+  const ruleHref = `/batch?${buildRuleQuery({
+    min: minKb,
+    max: maxKb,
+    w: targetWidth,
+    h: targetHeight,
+    format: outputFormat,
+    fit,
+  })}`
+
+  return (
+    <>
+      <SeoHead
+        title="Batch compress photos to an exact KB range | FormPack"
+        description="Compress multiple JPG, PNG, or WebP images to an exact file-size range locally in your browser, then download a ZIP."
+        path="/batch"
+      />
+      <section className="mx-auto w-[min(calc(100%-3rem),var(--shell))] py-[clamp(3rem,7vw,6rem)] pb-[clamp(5rem,10vw,8rem)]">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-8 pb-[clamp(2.5rem,5vw,4rem)] max-[50rem]:grid-cols-1 max-[50rem]:items-start">
+          <div>
+            <div className="inline-flex items-center gap-[.55rem] text-[.68rem] uppercase tracking-[.05em] text-[var(--quiet)] [font-family:var(--font-mono)]">
+              <span className="home-kicker-dot" aria-hidden="true" />
+              {t("batch.kicker")}
+            </div>
+            <h1 className="my-4 max-w-[12ch] text-[clamp(3.2rem,7vw,6rem)] font-[680] leading-[.9] tracking-[-.075em] [text-wrap:balance]">
+              {t("batch.title")}
+            </h1>
+            <p className="mt-6 max-w-[58ch] text-[1.05rem] text-[var(--muted)] [text-wrap:pretty]">
+              {t("batch.intro")}
+            </p>
+          </div>
+          <div className="max-[50rem]:max-w-none">
+            <PrivacyNotice compact />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-[minmax(0,1.08fr)_minmax(22rem,.92fr)] gap-5 max-[50rem]:grid-cols-1">
+          <section
+            className="min-w-0 border border-[var(--border)] bg-[var(--surface)] p-[clamp(1.25rem,3vw,2rem)]"
+            aria-labelledby="batch-source-title"
+          >
+            <div
+              className="text-[.68rem] uppercase tracking-[.05em] text-[var(--quiet)] [font-family:var(--font-mono)]"
+              id="batch-source-title"
+            >
+              {t("batch.add")}
+            </div>
+            <label className="relative mt-4 flex min-h-52 cursor-pointer flex-col items-center justify-center gap-4 border border-dashed border-[var(--border)] bg-[var(--canvas)] p-6 text-center hover:border-[var(--ink)] hover:bg-[var(--raised)] has-[input:focus-visible]:outline has-[input:focus-visible]:outline-2 has-[input:focus-visible]:outline-[var(--focus)] has-[input:focus-visible]:outline-offset-[3px]">
+              <input
+                type="file"
+                multiple
+                accept="image/jpeg,image/png,image/webp,.heic,.heif,image/heic,image/heif"
+                onChange={(event) => void addFiles(event)}
+                className="absolute h-px w-px overflow-hidden opacity-0"
+              />
+              <ImagePlus size={34} strokeWidth={1.5} aria-hidden="true" />
+              <strong className="text-[1.02rem]">
+                {items.length
+                  ? t("batch.chooseAnother")
+                  : t("batch.choose")}
+              </strong>
+              <small className="max-w-[34ch] text-[.8rem] text-[var(--muted)]">
+                {t("batch.chooseHint")}
+              </small>
+            </label>
+
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border)] pt-4 text-[.76rem] text-[var(--muted)]">
+              <span>
+                {items.length} {t("batch.files")} · {formatBytes(totalInputBytes)}
+              </span>
+              {doneCount > 0 ? (
+                <span>
+                  {doneCount} {t("batch.files")} · {formatBytes(totalOutputBytes)}
+                </span>
+              ) : null}
+            </div>
+
+            {items.length ? (
+              <ul className="batch-list">
+                {items.map((item) => (
+                  <li className="batch-row" key={item.id}>
+                    <div>
+                      <strong>{item.file.name}</strong>
+                      <small>
+                        {formatBytes(item.file.size)}
+                        {item.width && item.height
+                          ? ` · ${item.width} × ${item.height} px`
+                          : ""}
+                        {item.result
+                          ? ` → ${formatBytes(item.result.blob.size)} · ${item.result.width} × ${item.result.height} px`
+                          : ""}
+                      </small>
+                      {item.error ? (
+                        <small className="batch-error">{item.error}</small>
+                      ) : null}
+                    </div>
+                    <span className="batch-status" data-status={item.status}>
+                      {item.status === "processing"
+                        ? t("batch.compressing")
+                        : item.status === "done"
+                          ? item.result?.inRange
+                            ? t("batch.inRange")
+                            : t("batch.closest")
+                          : item.status === "error"
+                            ? t("batch.error")
+                            : t("batch.ready")}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      {item.result ? (
+                        <a
+                          href={item.result.url}
+                          download={`${item.file.name.replace(/\.[^.]+$/, "")}${outputFormat === "PNG" ? ".png" : ".jpg"}`}
+                          className="batch-download"
+                        >
+                          <Download size={14} aria-hidden="true" />{" "}
+                          {t("common.download")}
+                        </a>
+                      ) : null}
+                      <button
+                        type="button"
+                        className="batch-remove"
+                        onClick={() => removeItem(item.id)}
+                        aria-label={t("batch.remove")}
+                      >
+                        <Trash2 size={14} aria-hidden="true" />
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </section>
+
+          <form
+            className="min-w-0 border border-[var(--border)] bg-[var(--surface)] p-[clamp(1.25rem,3vw,2rem)]"
+            onSubmit={(event) => event.preventDefault()}
+          >
+            <div className="text-[.68rem] uppercase tracking-[.05em] text-[var(--quiet)] [font-family:var(--font-mono)]">
+              {t("batch.rule")}
+            </div>
+            <div className="mt-4 border-b border-[var(--border)] pb-5">
+              <h2 className="m-0 text-[1.45rem] leading-[1.1] tracking-[-.035em]">
+                {t("batch.settings")}
+              </h2>
+              <p className="mt-[.45rem] text-[.86rem] text-[var(--muted)]">
+                {t("batch.settingsHint")}
+              </p>
+            </div>
+
+            <fieldset className="mt-5 border-0 p-0">
+              <legend className="text-[.78rem] font-semibold text-[var(--muted)]">
+                {t("batch.targetSize")}
+              </legend>
+              <div className="mt-[.55rem] grid grid-cols-2 gap-3">
+                <label className="flex min-w-0 flex-col gap-[.45rem]">
+                  <span className="text-[.78rem] font-semibold text-[var(--muted)]">
+                    {t("batch.min")}
+                  </span>
+                  <input
+                    type="number"
+                    min="1"
+                    inputMode="numeric"
+                    placeholder="20"
+                    value={minKb}
+                    onChange={(event) => setMinKb(event.target.value)}
+                    className="min-h-12 w-full rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-[.7rem] text-base text-[var(--ink)] outline-0 focus:border-[var(--focus)] focus:outline-2 focus:outline-[color-mix(in_oklch,var(--focus)_28%,transparent)]"
+                  />
+                </label>
+                <label className="flex min-w-0 flex-col gap-[.45rem]">
+                  <span className="text-[.78rem] font-semibold text-[var(--muted)]">
+                    {t("batch.max")}
+                  </span>
+                  <input
+                    type="number"
+                    min="1"
+                    inputMode="numeric"
+                    placeholder="50"
+                    value={maxKb}
+                    onChange={(event) => setMaxKb(event.target.value)}
+                    className="min-h-12 w-full rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-[.7rem] text-base text-[var(--ink)] outline-0 focus:border-[var(--focus)] focus:outline-2 focus:outline-[color-mix(in_oklch,var(--focus)_28%,transparent)]"
+                  />
+                </label>
+              </div>
+            </fieldset>
+
+            <fieldset className="mt-5 border-0 p-0">
+              <legend className="text-[.78rem] font-semibold text-[var(--muted)]">
+                {t("batch.targetDimensions")}
+              </legend>
+              <div className="mt-[.55rem] grid grid-cols-2 gap-3">
+                <label className="flex min-w-0 flex-col gap-[.45rem]">
+                  <span className="text-[.78rem] font-semibold text-[var(--muted)]">
+                    {t("batch.width")}
+                  </span>
+                  <input
+                    type="number"
+                    min="1"
+                    inputMode="numeric"
+                    placeholder={t("batch.keepOriginal")}
+                    value={targetWidth}
+                    onChange={(event) => setTargetWidth(event.target.value)}
+                    className="min-h-12 w-full rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-[.7rem] text-base text-[var(--ink)] outline-0 focus:border-[var(--focus)] focus:outline-2 focus:outline-[color-mix(in_oklch,var(--focus)_28%,transparent)]"
+                  />
+                </label>
+                <label className="flex min-w-0 flex-col gap-[.45rem]">
+                  <span className="text-[.78rem] font-semibold text-[var(--muted)]">
+                    {t("batch.height")}
+                  </span>
+                  <input
+                    type="number"
+                    min="1"
+                    inputMode="numeric"
+                    placeholder={t("batch.keepOriginal")}
+                    value={targetHeight}
+                    onChange={(event) => setTargetHeight(event.target.value)}
+                    className="min-h-12 w-full rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-[.7rem] text-base text-[var(--ink)] outline-0 focus:border-[var(--focus)] focus:outline-2 focus:outline-[color-mix(in_oklch,var(--focus)_28%,transparent)]"
+                  />
+                </label>
+              </div>
+              <small className="mt-[.6rem] block text-[.75rem] leading-[1.45] text-[var(--muted)]">
+                {t("batch.dimensionHint")}
+              </small>
+            </fieldset>
+
+            <label className="mt-5 flex flex-col gap-[.45rem]">
+              <span className="text-[.78rem] font-semibold text-[var(--muted)]">
+                {t("batch.format")}
+              </span>
+              <select
+                value={outputFormat}
+                onChange={(event) =>
+                  setOutputFormat(event.target.value as "JPEG" | "PNG")
+                }
+                className="min-h-12 w-full rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-[.7rem] text-base text-[var(--ink)] outline-0 focus:border-[var(--focus)] focus:outline-2 focus:outline-[color-mix(in_oklch,var(--focus)_28%,transparent)]"
+              >
+                <option>JPEG</option>
+                <option>PNG</option>
+              </select>
+            </label>
+
+            <label className="mt-5 flex flex-col gap-[.45rem]">
+              <span className="text-[.78rem] font-semibold text-[var(--muted)]">
+                {t("batch.fit")}
+              </span>
+              <select
+                value={fit}
+                onChange={(event) => setFit(event.target.value as FitMode)}
+                className="min-h-12 w-full rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-[.7rem] text-base text-[var(--ink)] outline-0 focus:border-[var(--focus)] focus:outline-2 focus:outline-[color-mix(in_oklch,var(--focus)_28%,transparent)]"
+              >
+                <option value="cover">Crop to fill (recommended)</option>
+                <option value="contain">Fit inside (add borders)</option>
+                <option value="stretch">Stretch to exact dimensions</option>
+              </select>
+            </label>
+
+            <div className="mt-4">
+              <RuleLinkButton href={ruleHref} label={t("batch.share")} />
+            </div>
+
+            <div className="mt-6 grid gap-3 border-t border-[var(--border)] pt-5">
+              <span className="text-[.76rem] text-[var(--muted)]" role="status">
+                {converting
+                  ? t("batch.converting")
+                  : !items.length
+                    ? t("batch.noFiles")
+                    : doneCount === items.length && !processing
+                      ? t("batch.complete")
+                      : !rangeIsValid
+                        ? t("batch.targetSize")
+                        : !dimensionsAreValid
+                          ? t("batch.dimensionHint")
+                          : processing
+                            ? t("batch.compressing")
+                            : `${t("batch.ready")} · ${items.length} ${t("batch.files")}`}
+              </span>
+              <button
+                type="button"
+                disabled={!canCompress}
+                onClick={() => void compressAll()}
+                className="inline-flex min-h-[3.25rem] w-full items-center justify-between gap-4 border border-[var(--signal)] bg-[var(--signal)] px-4 py-[.8rem] font-bold text-[var(--ink)] transition-[transform,background-color,opacity] duration-150 ease-out hover:bg-[var(--signal-hover)] active:scale-[.96] disabled:cursor-not-allowed disabled:border-[var(--border)] disabled:bg-[var(--raised)] disabled:text-[var(--quiet)] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--focus)]"
+              >
+                {processing
+                  ? t("batch.compressing")
+                  : doneCount === items.length && items.length > 0
+                    ? t("batch.compressAgain")
+                    : t("batch.compress")}{" "}
+                <ArrowRight size={16} aria-hidden="true" />
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <section
+          className="mt-[clamp(2rem,4vw,3rem)] border border-[var(--ink)] bg-[var(--surface)]"
+          aria-labelledby="batch-results-title"
+        >
+          <div className="flex flex-wrap items-end justify-between gap-4 border-b border-[var(--border)] p-5">
+            <div>
+              <div className="text-[.68rem] uppercase tracking-[.05em] text-[var(--quiet)] [font-family:var(--font-mono)]">
+                {t("batch.results")}
+              </div>
+              <h2
+                className="mt-[.65rem] text-[1.45rem] leading-[1.1] tracking-[-.035em]"
+                id="batch-results-title"
+              >
+                {t("batch.resultsTitle")}
+              </h2>
+            </div>
+            <span className="text-[.72rem] text-[var(--muted)]">
+              {doneCount}/{items.length} {t("batch.files")} · {inRangeCount}{" "}
+              {t("batch.inRange")}
+            </span>
+          </div>
+          <div className="grid gap-4 p-5">
+            {doneCount > 0 ? (
+              <button
+                type="button"
+                onClick={() => void downloadZip()}
+                className="flex min-h-12 items-center justify-center gap-2 border border-[var(--ink)] bg-[var(--ink)] px-4 py-3 text-[.82rem] font-[680] text-[var(--surface)] hover:bg-[var(--signal)]"
+              >
+                <FileArchive size={17} aria-hidden="true" />{" "}
+                {t("batch.downloadAll")}
+              </button>
+            ) : null}
+            {zipUrl ? (
+              <a
+                href={zipUrl}
+                download="formpack-batch.zip"
+                className="text-[.8rem] font-[680] text-[var(--ink)] underline underline-offset-4"
+              >
+                {t("batch.downloadAll")}
+              </a>
+            ) : null}
+            {doneCount === 0 ? (
+              <p className="text-[.8rem] leading-[1.55] text-[var(--muted)]">
+                {t("batch.noFiles")}
+              </p>
+            ) : null}
+          </div>
+        </section>
+
+        <ArticleBlock content={toolContent["/batch"]} className="tool-article" />
+      </section>
+    </>
+  )
+}
+
+type CheckRule = {
+  format: "JPG" | "PNG" | "PDF"
+  minKb: string
+  maxKb: string
+  width: string
+  height: string
+  maxPages: string
+}
+
+type CheckedFile = {
+  file: File
+  width?: number
+  height?: number
+  pageCount?: number
+}
+
+type CheckResult = {
+  formatPass: boolean
+  sizePass: boolean
+  dimensionPass: boolean | null
+  pagePass: boolean | null
+  sizeKb: number
+}
+
+export function FileCheckerPage() {
+  const { t } = useI18n()
+  const initialSearch = new URLSearchParams(window.location.search)
+  const initialPresetSlug = initialSearch.get("preset")
+  const initialFieldKind = initialSearch.get("field")
+  const initialPreset = initialPresetSlug
+    ? getExamPreset(initialPresetSlug)
+    : undefined
+  const initialField =
+    initialPreset?.fields.find((field) => field.kind === initialFieldKind) ??
+    initialPreset?.fields[0]
+
+  const initialFormat = initialSearch.get("format")
+  const [rule, setRule] = useState<CheckRule>({
+    format:
+      initialFormat === "PNG" || initialFormat === "PDF"
+        ? initialFormat
+        : initialFormat === "JPG"
+          ? "JPG"
+          : (initialField?.format ?? "JPG"),
+    minKb:
+      initialSearch.get("min") ??
+      (initialField ? String(initialField.minKb) : ""),
+    maxKb:
+      initialSearch.get("max") ??
+      (initialField ? String(initialField.maxKb) : ""),
+    width:
+      initialSearch.get("w") ??
+      (initialField ? String(initialField.width ?? "") : ""),
+    height:
+      initialSearch.get("h") ??
+      (initialField ? String(initialField.height ?? "") : ""),
+    maxPages: initialSearch.get("pages") ?? "",
+  })
+  const [presetValue, setPresetValue] = useState(
+    initialPreset && initialField
+      ? `${initialPreset.slug}:${initialField.kind}`
+      : "",
+  )
+  const [picked, setPicked] = useState<CheckedFile | null>(null)
+  const [result, setResult] = useState<CheckResult | null>(null)
+  const [checking, setChecking] = useState(false)
+  const [error, setError] = useState("")
+
+  const updateRule = (changes: Partial<CheckRule>) => {
+    setRule((current) => ({ ...current, ...changes }))
+    setPresetValue("")
+    setResult(null)
+  }
+
+  const applyPreset = (value: string) => {
+    setPresetValue(value)
+    if (!value) return
+    const [slug, kind] = value.split(":")
+    const preset = getExamPreset(slug)
+    const field = preset?.fields.find((item) => item.kind === kind)
+    if (!field) return
+    setRule({
+      format: field.format,
+      minKb: String(field.minKb),
+      maxKb: String(field.maxKb),
+      width: String(field.width ?? ""),
+      height: String(field.height ?? ""),
+      maxPages: "",
+    })
+    setResult(null)
+  }
+
+  const onFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ""
+    if (!file) return
+    setChecking(true)
+    setResult(null)
+    setError("")
+    try {
+      const normalized = await normalizeImageFile(file)
+      if (normalized.type === "application/pdf") {
+        const pageCount = await readPdfPageCount(normalized)
+        setPicked({ file: normalized, pageCount })
+      } else {
+        const bitmap = await createImageBitmap(normalized)
+        setPicked({
+          file: normalized,
+          width: bitmap.width,
+          height: bitmap.height,
+        })
+        bitmap.close()
+      }
+    } catch {
+      setPicked(null)
+      setError(t("checker.error"))
+    } finally {
+      setChecking(false)
+    }
+  }
+
+  const checkFile = () => {
+    if (!picked) return
+    const formatPass =
+      rule.format === "PDF"
+        ? picked.file.type === "application/pdf"
+        : rule.format === "PNG"
+          ? picked.file.type === "image/png"
+          : picked.file.type === "image/jpeg"
+    const sizeKb = picked.file.size / 1024
+    const min = Number(rule.minKb)
+    const max = Number(rule.maxKb)
+    const sizePass =
+      (!rule.minKb.trim() || sizeKb >= min) &&
+      (!rule.maxKb.trim() || sizeKb <= max)
+    const dimensionPass =
+      rule.width.trim() && rule.height.trim()
+        ? picked.width === Number(rule.width) &&
+          picked.height === Number(rule.height)
+        : null
+    const pagePass =
+      rule.maxPages.trim() && picked.pageCount !== undefined
+        ? picked.pageCount <= Number(rule.maxPages)
+        : null
+    setResult({
+      formatPass,
+      sizePass,
+      dimensionPass,
+      pagePass,
+      sizeKb,
+    })
+  }
+
+  const presetOptions = examPresets.flatMap((preset) =>
+    preset.fields.map((field) => ({
+      value: `${preset.slug}:${field.kind}`,
+      label: `${preset.exam} — ${field.label}`,
+    })),
+  )
+
+  const ruleHref = `/file-checker?${buildRuleQuery({
+    format: rule.format,
+    min: rule.minKb,
+    max: rule.maxKb,
+    w: rule.width,
+    h: rule.height,
+    pages: rule.maxPages,
+    preset: presetValue ? presetValue.split(":")[0] : undefined,
+    field: presetValue ? presetValue.split(":")[1] : undefined,
+  })}`
+
+  const measuredPass = result
+    ? result.formatPass &&
+      result.sizePass &&
+      (result.dimensionPass ?? true) &&
+      (result.pagePass ?? true)
+    : false
+
+  return (
+    <>
+      <SeoHead
+        title="Will my file pass? Upload rule checker | FormPack"
+        description="Check a photo, signature, or PDF against an upload rule locally before you submit it."
+        path="/file-checker"
+      />
+      <section className="mx-auto w-[min(calc(100%-3rem),var(--shell))] py-[clamp(3rem,7vw,6rem)] pb-[clamp(5rem,10vw,8rem)]">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-8 pb-[clamp(2.5rem,5vw,4rem)] max-[50rem]:grid-cols-1 max-[50rem]:items-start">
+          <div>
+            <div className="inline-flex items-center gap-[.55rem] text-[.68rem] uppercase tracking-[.05em] text-[var(--quiet)] [font-family:var(--font-mono)]">
+              <span className="home-kicker-dot" aria-hidden="true" />
+              {t("checker.kicker")}
+            </div>
+            <h1 className="my-4 max-w-[15ch] text-[clamp(3.2rem,7vw,6rem)] font-[680] leading-[.9] tracking-[-.075em] [text-wrap:balance]">
+              {t("checker.title")}
+            </h1>
+            <p className="mt-6 max-w-[58ch] text-[1.05rem] text-[var(--muted)] [text-wrap:pretty]">
+              {t("checker.intro")}
+            </p>
+          </div>
+          <div className="max-[50rem]:max-w-none">
+            <PrivacyNotice compact />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-[minmax(0,1.08fr)_minmax(22rem,.92fr)] gap-5 max-[50rem]:grid-cols-1">
+          <section
+            className="min-w-0 border border-[var(--border)] bg-[var(--surface)] p-[clamp(1.25rem,3vw,2rem)]"
+            aria-labelledby="checker-source-title"
+          >
+            <div
+              className="text-[.68rem] uppercase tracking-[.05em] text-[var(--quiet)] [font-family:var(--font-mono)]"
+              id="checker-source-title"
+            >
+              {t("checker.add")}
+            </div>
+            <label className="relative mt-4 flex min-h-64 cursor-pointer flex-col items-center justify-center gap-4 border border-dashed border-[var(--border)] bg-[var(--canvas)] p-6 text-center hover:border-[var(--ink)] hover:bg-[var(--raised)] has-[input:focus-visible]:outline has-[input:focus-visible]:outline-2 has-[input:focus-visible]:outline-[var(--focus)] has-[input:focus-visible]:outline-offset-[3px]">
+              <input
+                type="file"
+                accept="image/jpeg,image/png,.heic,.heif,image/heic,image/heif,application/pdf"
+                onChange={(event) => void onFile(event)}
+                className="absolute h-px w-px overflow-hidden opacity-0"
+              />
+              {picked?.file.type === "application/pdf" ? (
+                <FileText size={34} strokeWidth={1.5} aria-hidden="true" />
+              ) : (
+                <ImagePlus size={34} strokeWidth={1.5} aria-hidden="true" />
+              )}
+              <strong className="text-[1.02rem]">
+                {picked ? picked.file.name : t("checker.choose")}
+              </strong>
+              <small className="max-w-[36ch] text-[.8rem] text-[var(--muted)]">
+                {t("checker.chooseHint")}
+              </small>
+            </label>
+
+            {picked ? (
+              <div className="mt-4 grid gap-2 border-t border-[var(--border)] pt-4 text-[.8rem]">
+                <div className="flex justify-between gap-4">
+                  <span className="text-[var(--muted)]">
+                    {t("checker.size")}
+                  </span>
+                  <strong className="[font-family:var(--font-mono)]">
+                    {formatBytes(picked.file.size)}
+                  </strong>
+                </div>
+                {picked.width && picked.height ? (
+                  <div className="flex justify-between gap-4">
+                    <span className="text-[var(--muted)]">
+                      {t("checker.dimensions")}
+                    </span>
+                    <strong className="[font-family:var(--font-mono)]">
+                      {picked.width} × {picked.height} px
+                    </strong>
+                  </div>
+                ) : null}
+                {picked.pageCount !== undefined ? (
+                  <div className="flex justify-between gap-4">
+                    <span className="text-[var(--muted)]">
+                      {t("checker.pages")}
+                    </span>
+                    <strong className="[font-family:var(--font-mono)]">
+                      {picked.pageCount}
+                    </strong>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {error ? (
+              <p className="mt-4 text-[.78rem] text-[var(--danger)]" role="status">
+                {error}
+              </p>
+            ) : null}
+
+            <div className="mt-4 border border-[var(--border-soft)] bg-[var(--canvas)] p-4">
+              <strong className="text-[.82rem]">{t("checker.visual")}</strong>
+              <p className="mt-1 text-[.76rem] leading-[1.5] text-[var(--muted)]">
+                {t("checker.visualBody")}
+              </p>
+            </div>
+          </section>
+
+          <form
+            className="min-w-0 border border-[var(--border)] bg-[var(--surface)] p-[clamp(1.25rem,3vw,2rem)]"
+            onSubmit={(event) => event.preventDefault()}
+          >
+            <div className="text-[.68rem] uppercase tracking-[.05em] text-[var(--quiet)] [font-family:var(--font-mono)]">
+              {t("checker.rule")}
+            </div>
+            <div className="mt-4 border-b border-[var(--border)] pb-5">
+              <h2 className="m-0 text-[1.45rem] leading-[1.1] tracking-[-.035em]">
+                {t("checker.settings")}
+              </h2>
+            </div>
+
+            <label className="mt-5 grid gap-2 text-[.78rem] font-semibold text-[var(--muted)]">
+              {t("checker.preset")}
+              <select
+                value={presetValue}
+                onChange={(event) => applyPreset(event.target.value)}
+                className="min-h-12 w-full rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-[.7rem] text-base font-normal text-[var(--ink)] outline-0 focus:border-[var(--focus)] focus:outline-2 focus:outline-[color-mix(in_oklch,var(--focus)_28%,transparent)]"
+              >
+                <option value="">{t("checker.custom")}</option>
+                {presetOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="mt-5 grid gap-2 text-[.78rem] font-semibold text-[var(--muted)]">
+              {t("checker.format")}
+              <select
+                value={rule.format}
+                onChange={(event) =>
+                  updateRule({
+                    format: event.target.value as "JPG" | "PNG" | "PDF",
+                  })
+                }
+                className="min-h-12 w-full rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-[.7rem] text-base font-normal text-[var(--ink)] outline-0 focus:border-[var(--focus)] focus:outline-2 focus:outline-[color-mix(in_oklch,var(--focus)_28%,transparent)]"
+              >
+                <option>JPG</option>
+                <option>PNG</option>
+                <option>PDF</option>
+              </select>
+            </label>
+
+            <fieldset className="mt-5 grid grid-cols-2 gap-3 border-0 p-0">
+              <label className="grid gap-2 text-[.76rem] text-[var(--muted)]">
+                {t("checker.min")}
+                <input
+                  type="number"
+                  min="0"
+                  inputMode="numeric"
+                  value={rule.minKb}
+                  onChange={(event) => updateRule({ minKb: event.target.value })}
+                  className="min-h-12 w-full rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-[.7rem] text-base text-[var(--ink)] outline-0 focus:border-[var(--focus)] focus:outline-2 focus:outline-[color-mix(in_oklch,var(--focus)_28%,transparent)]"
+                />
+              </label>
+              <label className="grid gap-2 text-[.76rem] text-[var(--muted)]">
+                {t("checker.max")}
+                <input
+                  type="number"
+                  min="0"
+                  inputMode="numeric"
+                  value={rule.maxKb}
+                  onChange={(event) => updateRule({ maxKb: event.target.value })}
+                  className="min-h-12 w-full rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-[.7rem] text-base text-[var(--ink)] outline-0 focus:border-[var(--focus)] focus:outline-2 focus:outline-[color-mix(in_oklch,var(--focus)_28%,transparent)]"
+                />
+              </label>
+            </fieldset>
+
+            <fieldset className="mt-5 grid grid-cols-2 gap-3 border-0 p-0">
+              <label className="grid gap-2 text-[.76rem] text-[var(--muted)]">
+                {t("checker.width")}
+                <input
+                  type="number"
+                  min="1"
+                  inputMode="numeric"
+                  value={rule.width}
+                  onChange={(event) => updateRule({ width: event.target.value })}
+                  className="min-h-12 w-full rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-[.7rem] text-base text-[var(--ink)] outline-0 focus:border-[var(--focus)] focus:outline-2 focus:outline-[color-mix(in_oklch,var(--focus)_28%,transparent)]"
+                />
+              </label>
+              <label className="grid gap-2 text-[.76rem] text-[var(--muted)]">
+                {t("checker.height")}
+                <input
+                  type="number"
+                  min="1"
+                  inputMode="numeric"
+                  value={rule.height}
+                  onChange={(event) => updateRule({ height: event.target.value })}
+                  className="min-h-12 w-full rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-[.7rem] text-base text-[var(--ink)] outline-0 focus:border-[var(--focus)] focus:outline-2 focus:outline-[color-mix(in_oklch,var(--focus)_28%,transparent)]"
+                />
+              </label>
+            </fieldset>
+
+            <label className="mt-5 grid gap-2 text-[.76rem] text-[var(--muted)]">
+              {t("checker.maxPages")}
+              <input
+                type="number"
+                min="1"
+                inputMode="numeric"
+                value={rule.maxPages}
+                onChange={(event) => updateRule({ maxPages: event.target.value })}
+                className="min-h-12 w-full rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-[.7rem] text-base text-[var(--ink)] outline-0 focus:border-[var(--focus)] focus:outline-2 focus:outline-[color-mix(in_oklch,var(--focus)_28%,transparent)]"
+              />
+            </label>
+
+            <div className="mt-4">
+              <RuleLinkButton href={ruleHref} label={t("checker.share")} />
+            </div>
+
+            <div className="mt-6 grid gap-3 border-t border-[var(--border)] pt-5">
+              <span className="text-[.76rem] text-[var(--muted)]" role="status">
+                {checking
+                  ? t("checker.checking")
+                  : !picked
+                    ? t("checker.noFile")
+                    : result
+                      ? t("checker.complete")
+                      : t("checker.ready")}
+              </span>
+              <button
+                type="button"
+                disabled={!picked || checking}
+                onClick={checkFile}
+                className="inline-flex min-h-[3.25rem] w-full items-center justify-between gap-4 border border-[var(--signal)] bg-[var(--signal)] px-4 py-[.8rem] font-bold text-[var(--ink)] transition-[transform,background-color,opacity] duration-150 ease-out hover:bg-[var(--signal-hover)] active:scale-[.96] disabled:cursor-not-allowed disabled:border-[var(--border)] disabled:bg-[var(--raised)] disabled:text-[var(--quiet)] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--focus)]"
+              >
+                {checking ? t("checker.checking") : t("checker.check")}{" "}
+                <ArrowRight size={16} aria-hidden="true" />
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <section
+          className="mt-[clamp(2rem,4vw,3rem)] border border-[var(--ink)] bg-[var(--surface)]"
+          aria-labelledby="checker-results-title"
+        >
+          <div className="flex flex-wrap items-end justify-between gap-4 border-b border-[var(--border)] p-5">
+            <div>
+              <div className="text-[.68rem] uppercase tracking-[.05em] text-[var(--quiet)] [font-family:var(--font-mono)]">
+                {t("checker.results")}
+              </div>
+              <h2
+                className="mt-[.65rem] text-[1.45rem] leading-[1.1] tracking-[-.035em]"
+                id="checker-results-title"
+              >
+                {result
+                  ? measuredPass
+                    ? t("checker.pass")
+                    : t("checker.fail")
+                  : t("checker.resultsTitle")}
+              </h2>
+            </div>
+            <span className="text-[.72rem] text-[var(--muted)]">
+              {picked ? `${picked.file.name} · ${formatBytes(picked.file.size)}` : ""}
+            </span>
+          </div>
+          <div className="grid gap-4 p-5">
+            {!picked ? (
+              <p className="text-[.8rem] leading-[1.55] text-[var(--muted)]">
+                {t("checker.noFile")}
+              </p>
+            ) : null}
+            {result ? (
+              <>
+                <ul className="grid gap-2 p-0">
+                  <CheckLine ready={result.formatPass}>
+                    {t("checker.formatCheck")}
+                  </CheckLine>
+                  <CheckLine ready={result.sizePass}>
+                    {t("checker.size")} ({result.sizeKb.toFixed(1)} KB)
+                  </CheckLine>
+                  {result.dimensionPass !== null ? (
+                    <CheckLine ready={result.dimensionPass}>
+                      {t("checker.dimensions")}
+                    </CheckLine>
+                  ) : null}
+                  {result.pagePass !== null ? (
+                    <CheckLine ready={result.pagePass}>
+                      {t("checker.pages")}
+                    </CheckLine>
+                  ) : null}
+                </ul>
+                <div className="border border-[var(--border-soft)] bg-[var(--canvas)] p-4">
+                  <strong className="text-[.82rem]">{t("checker.visual")}</strong>
+                  <p className="mt-1 text-[.76rem] leading-[1.5] text-[var(--muted)]">
+                    {t("checker.visualBody")}
+                  </p>
+                </div>
+              </>
+            ) : null}
+            {picked && !result ? (
+              <p className="text-[.8rem] leading-[1.55] text-[var(--muted)]">
+                {t("checker.ready")}
+              </p>
+            ) : null}
+          </div>
+        </section>
+
+        <ArticleBlock
+          content={toolContent["/file-checker"]}
+          className="tool-article"
+        />
+      </section>
+    </>
+  )
+}
+
 export function PdfCompressorPage() {
+  const { t } = useI18n()
+  const initialSearch = new URLSearchParams(window.location.search)
+  const searchMin = initialSearch.get("min") ?? ""
+  const searchMax = initialSearch.get("max") ?? ""
+  const presetSlug = initialSearch.get("preset") ?? undefined
+  const preset = presetSlug ? getExamPreset(presetSlug) : undefined
+
   const [source, setSource] = useState<File | null>(null)
-  const [minKb, setMinKb] = useState("")
-  const [maxKb, setMaxKb] = useState("")
+  const [minKb, setMinKb] = useState(searchMin)
+  const [maxKb, setMaxKb] = useState(searchMax)
+
+  useEffect(() => {
+    if (searchMin) setMinKb(searchMin)
+    if (searchMax) setMaxKb(searchMax)
+  }, [searchMin, searchMax])
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState("")
   const [pageCount, setPageCount] = useState<number | null>(null)
@@ -645,15 +1831,23 @@ export function PdfCompressorPage() {
           <div>
             <div className="inline-flex items-center gap-[.55rem] text-[.68rem] uppercase tracking-[.05em] text-[var(--quiet)] [font-family:var(--font-mono)]">
               <span className="home-kicker-dot" aria-hidden="true" />
-              PDF compressor / local processing
+              {t("pdf.kicker")}
             </div>
             <h1 className="my-4 max-w-[11ch] text-[clamp(3.2rem,7vw,6rem)] font-[680] leading-[.9] tracking-[-.075em] [text-wrap:balance]">
-              Bring your PDF under the portal limit.
+              {t("pdf.title")}
             </h1>
             <p className="mt-6 max-w-[58ch] text-[1.05rem] text-[var(--muted)] [text-wrap:pretty]">
-              Copy the exact KB rule from the form. FormPack will prepare one
-              smaller PDF on this device.
+              {t("pdf.intro")}
             </p>
+            {preset ? (
+              <p className="preset-loaded">
+                {t("pdf.loadedFrom")}{" "}
+                <Link to="/presets/$slug" params={{ slug: preset.slug }}>
+                  {preset.exam}
+                </Link>
+                . {t("pdf.confirm")}
+              </p>
+            ) : null}
           </div>
           <div className="max-[50rem]:max-w-none">
             <PrivacyNotice compact />
@@ -671,7 +1865,7 @@ export function PdfCompressorPage() {
               className="text-[.68rem] uppercase tracking-[.05em] text-[var(--quiet)] [font-family:var(--font-mono)]"
               id="pdf-source-title"
             >
-              01 / Add your PDF
+              {t("pdf.add")}
             </div>
             <label
               className={
@@ -702,15 +1896,15 @@ export function PdfCompressorPage() {
                 <span className="flex flex-col items-center gap-[.6rem] [&>svg]:mb-2 [&>svg]:h-11 [&>svg]:w-11 [&>svg]:text-[var(--proof)] [&>svg]:[stroke-width:1.5]">
                   <FileText aria-hidden="true" />
                   <strong className="text-[1.08rem] tracking-[-.02em]">
-                    Choose a PDF
+                    {t("pdf.choose")}
                   </strong>
                   <small className="max-w-[28ch] text-[.82rem] text-[var(--muted)] [text-wrap:pretty]">
-                    Use one PDF from your device storage.
+                    {t("pdf.chooseHint")}
                   </small>
                 </span>
               )}
               <span className="inline-flex min-h-11 items-center gap-[.45rem] border border-[var(--ink)] bg-[var(--surface)] px-[.85rem] py-[.65rem] text-[.82rem] font-bold text-[var(--ink)]">
-                {source ? "Choose another PDF" : "Choose a PDF"}
+                {source ? t("pdf.chooseAnother") : t("pdf.choose")}
                 <ArrowRight size={15} aria-hidden="true" />
               </span>
             </label>
@@ -751,25 +1945,25 @@ export function PdfCompressorPage() {
             onSubmit={(event) => event.preventDefault()}
           >
             <div className="text-[.68rem] uppercase tracking-[.05em] text-[var(--quiet)] [font-family:var(--font-mono)]">
-              02 / Copy the portal rule
+              {t("pdf.rule")}
             </div>
             <div className="mt-4 border-b border-[var(--border)] pb-5">
               <h2 className="m-0 text-[1.45rem] leading-[1.1] tracking-[-.035em]">
-                Exact output settings
+                {t("pdf.settings")}
               </h2>
               <p className="mt-[.45rem] text-[.86rem] text-[var(--muted)]">
-                Use the values printed beside the upload field.
+                {t("pdf.settingsHint")}
               </p>
             </div>
 
             <fieldset className="mt-5 border-0 p-0">
               <legend className="text-[.78rem] font-semibold text-[var(--muted)]">
-                Target file size
+                {t("pdf.targetSize")}
               </legend>
               <div className="mt-[.55rem] grid grid-cols-2 gap-3">
                 <label className="flex min-w-0 flex-col gap-[.45rem]">
                   <span className="text-[.78rem] font-semibold text-[var(--muted)]">
-                    Minimum
+                    {t("pdf.min")}
                   </span>
                   <div className="grid grid-cols-[minmax(0,1fr)_auto]">
                     <input
@@ -789,7 +1983,7 @@ export function PdfCompressorPage() {
                 </label>
                 <label className="flex min-w-0 flex-col gap-[.45rem]">
                   <span className="text-[.78rem] font-semibold text-[var(--muted)]">
-                    Maximum
+                    {t("pdf.max")}
                   </span>
                   <div className="grid grid-cols-[minmax(0,1fr)_auto]">
                     <input
@@ -835,6 +2029,18 @@ export function PdfCompressorPage() {
               </div>
             </div>
 
+            {rangeIsValid ? (
+              <RuleLinkButton
+                className="mt-4"
+                href={`/pdf-compressor?${buildRuleQuery({
+                  min: minKb,
+                  max: maxKb,
+                  preset: presetSlug,
+                })}`}
+                label={t("pdf.share")}
+              />
+            ) : null}
+
             <div className="mt-6 grid gap-3 border-t border-[var(--border)] pt-5">
               <span
                 className="text-[.76rem] text-[var(--muted)] [text-wrap:pretty]"
@@ -843,12 +2049,12 @@ export function PdfCompressorPage() {
                 {error
                   ? error
                   : processing
-                    ? "Preparing the PDF locally…"
+                    ? t("pdf.preparing")
                     : result
-                      ? "Result ready below."
+                      ? t("pdf.resultReady")
                       : formIsComplete
-                        ? "Ready to process this PDF locally."
-                        : "Add a PDF and complete the target range."}
+                        ? t("pdf.ready")
+                        : t("pdf.complete")}
               </span>
               <button
                 className="inline-flex min-h-[3.25rem] w-full items-center justify-between gap-4 border border-[var(--signal)] bg-[var(--signal)] px-4 py-[.8rem] font-bold text-[var(--ink)] transition-[transform,background-color,opacity] duration-150 ease-out hover:bg-[var(--signal-hover)] active:scale-[.96] disabled:cursor-not-allowed disabled:border-[var(--border)] disabled:bg-[var(--raised)] disabled:text-[var(--quiet)] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--focus)]"
@@ -856,7 +2062,12 @@ export function PdfCompressorPage() {
                 disabled={!formIsComplete || processing}
                 onClick={() => void handleCompress()}
               >
-                {processing ? "Processing…" : result ? "Compress again" : "Compress PDF"} <ArrowRight size={16} aria-hidden="true" />
+                {processing
+                  ? t("pdf.processing")
+                  : result
+                    ? t("pdf.compressAgain")
+                    : t("pdf.compress")}{" "}
+                <ArrowRight size={16} aria-hidden="true" />
               </button>
             </div>
           </form>
@@ -870,17 +2081,21 @@ export function PdfCompressorPage() {
           <div className="flex items-end justify-between gap-8 border-b border-[var(--border)] p-5 max-[50rem]:flex-col max-[50rem]:items-start max-[50rem]:gap-4">
             <div>
               <div className="text-[.68rem] uppercase tracking-[.05em] text-[var(--quiet)] [font-family:var(--font-mono)]">
-                03 / Check the result
+                {t("pdf.check")}
               </div>
               <h2
                 className="mt-[.65rem] text-[1.45rem] leading-[1.1] tracking-[-.035em]"
                 id="pdf-output-title"
               >
-                Your in-range PDF will appear here.
+                {t("pdf.waiting")}
               </h2>
             </div>
             <span className={`whitespace-nowrap text-[.68rem] uppercase tracking-[.05em] [font-family:var(--font-mono)] max-[50rem]:whitespace-normal ${result?.inRange ? "text-[var(--ready)]" : "text-[var(--proof)]"}`}>
-              {result ? (result.inRange ? "In range" : "Closest result") : "Waiting for output"}
+              {result
+                ? result.inRange
+                  ? t("pdf.inRange")
+                  : t("pdf.closest")
+                : t("pdf.waitingOutput")}
             </span>
           </div>
           <div className="grid grid-cols-[minmax(0,1.1fr)_minmax(18rem,.9fr)] gap-px bg-[var(--border)] max-[50rem]:grid-cols-1">
@@ -951,14 +2166,20 @@ export function PhotoToPdfPage() {
     }
   }, [result?.url])
 
-  const addImages = (event: ChangeEvent<HTMLInputElement>) => {
-    const nextFiles = Array.from(event.target.files ?? [])
-    if (nextFiles.length > 0) {
+  const addImages = async (event: ChangeEvent<HTMLInputElement>) => {
+    const rawFiles = Array.from(event.target.files ?? [])
+    event.target.value = ""
+    if (!rawFiles.length) return
+    try {
+      const nextFiles = await normalizeImageFiles(rawFiles)
       setImages((current) => [...current, ...nextFiles])
       setResult(null)
       setError("")
+    } catch {
+      setError(
+        "One of the HEIC images could not be converted. Try JPG or PNG copies.",
+      )
     }
-    event.target.value = ""
   }
 
   const removeImage = (index: number) => {
@@ -1071,7 +2292,7 @@ export function PhotoToPdfPage() {
               <label className="relative mt-4 flex min-h-96 cursor-pointer flex-col items-center justify-center gap-5 border border-dashed border-[var(--border)] bg-[var(--canvas)] p-6 text-center transition-colors duration-150 ease-[var(--ease-out)] hover:border-[var(--ink)] hover:bg-[var(--raised)] has-[input:focus-visible]:outline has-[input:focus-visible]:outline-2 has-[input:focus-visible]:outline-[var(--focus)] has-[input:focus-visible]:outline-offset-[3px] max-[32rem]:min-h-80">
                 <input
                   type="file"
-                  accept="image/jpeg,image/png"
+                  accept="image/jpeg,image/png,.heic,.heif,image/heic,image/heif"
                   multiple
                   onChange={addImages}
                   className="absolute h-px w-px overflow-hidden opacity-0"
@@ -1163,7 +2384,7 @@ export function PhotoToPdfPage() {
                 <label className="flex min-h-12 cursor-pointer items-center justify-center gap-2 border-t border-[var(--border)] bg-[var(--canvas)] px-4 text-[.82rem] font-bold text-[var(--ink)] hover:bg-[var(--raised)]">
                   <input
                     type="file"
-                    accept="image/jpeg,image/png"
+                    accept="image/jpeg,image/png,.heic,.heif,image/heic,image/heif"
                     multiple
                     onChange={addImages}
                     className="absolute h-px w-px overflow-hidden opacity-0"
@@ -1414,12 +2635,15 @@ export function ImageDimensionsPage() {
     }
   }, [source])
 
-  const onFile = (event: ChangeEvent<HTMLInputElement>) => {
+  const onFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (file) {
-      setSource(file)
-      setResult(null)
-      setError("")
+    if (!file) return
+    setResult(null)
+    setError("")
+    try {
+      setSource(await normalizeImageFile(file))
+    } catch {
+      setError("The HEIC image could not be converted. Try a JPG or PNG copy.")
     }
   }
 
@@ -1514,7 +2738,7 @@ export function ImageDimensionsPage() {
             >
               <input
                 type="file"
-                accept="image/jpeg,image/png"
+                accept="image/jpeg,image/png,.heic,.heif,image/heic,image/heif"
                 onChange={onFile}
                 className="absolute h-px w-px overflow-hidden opacity-0"
               />
@@ -1790,6 +3014,25 @@ export function ImageDimensionsPage() {
 }
 
 export function SignaturePage() {
+  const initialSearch = new URLSearchParams(window.location.search)
+  const presetSlug = initialSearch.get("preset") ?? undefined
+  const fieldKind = initialSearch.get("field") ?? undefined
+  const preset = presetSlug ? getExamPreset(presetSlug) : undefined
+  const presetField =
+    preset?.fields.find((field) => field.kind === fieldKind) ??
+    preset?.fields.find((field) => field.kind === "signature")
+  const signatureRuleHref = presetField
+    ? `/photo-compressor?${buildRuleQuery({
+        min: String(presetField.minKb),
+        max: String(presetField.maxKb),
+        w: String(presetField.width ?? ""),
+        h: String(presetField.height ?? ""),
+        format: presetField.format,
+        preset: preset?.slug,
+        field: presetField.kind,
+      })}`
+    : ""
+
   const [source, setSource] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState("")
   const [sourceDimensions, setSourceDimensions] = useState<{
@@ -1833,12 +3076,17 @@ export function SignaturePage() {
     }
   }, [source])
 
-  const onFile = (event: ChangeEvent<HTMLInputElement>) => {
+  const onFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (file) {
-      setSource(file)
-      setResult(null)
-      setError("")
+    if (!file) return
+    setResult(null)
+    setError("")
+    try {
+      setSource(await normalizeImageFile(file))
+    } catch {
+      setError(
+        "The HEIC signature could not be converted. Try a JPG or PNG copy.",
+      )
     }
   }
 
@@ -1886,6 +3134,20 @@ export function SignaturePage() {
               Crop the empty space and clean the background around one
               signature. Your source file stays on this device.
             </p>
+            {presetField && preset ? (
+              <div className="preset-rule-banner">
+                <div>
+                  <strong>
+                    {preset.exam}: {presetField.label}
+                  </strong>
+                  <span>
+                    {presetField.format} · {presetField.minKb}–
+                    {presetField.maxKb} KB · {presetField.dimensionsLabel}
+                  </span>
+                </div>
+                <a href={signatureRuleHref}>Compress to this range →</a>
+              </div>
+            ) : null}
           </div>
           <div className="max-[50rem]:max-w-none">
             <PrivacyNotice compact />
@@ -1912,7 +3174,7 @@ export function SignaturePage() {
             >
               <input
                 type="file"
-                accept="image/jpeg,image/png"
+                accept="image/jpeg,image/png,.heic,.heif,image/heic,image/heif"
                 onChange={onFile}
                 className="absolute h-px w-px overflow-hidden opacity-0"
               />
@@ -2155,6 +3417,8 @@ export function SignaturePage() {
 }
 
 export function HomePage() {
+  const { t } = useI18n()
+
   return (
     <>
       <SeoHead
@@ -2166,26 +3430,23 @@ export function HomePage() {
         <div className="home-hero-copy">
           <div className="home-kicker">
             <span className="home-kicker-dot" aria-hidden="true" />
-            Local file utility / exact ranges
+            {t("home.kicker")}
           </div>
-          <h1>Hit the exact size range.</h1>
-          <p className="home-hero-intro">
-            Exam portals do not accept “roughly smaller.” Set the rule, choose a
-            file, and get a result that lands inside the required range.
-          </p>
+          <h1>{t("home.title")}</h1>
+          <p className="home-hero-intro">{t("home.intro")}</p>
           <div className="home-hero-actions">
-            <ActionLink to="/photo-compressor">Compress a photo</ActionLink>
+            <ActionLink to="/photo-compressor">{t("home.ctaPhoto")}</ActionLink>
             <Link className="home-secondary-action" to="/pdf-compressor">
-              Start with a PDF <ArrowRight size={16} aria-hidden="true" />
+              {t("home.ctaPdf")} <ArrowRight size={16} aria-hidden="true" />
             </Link>
           </div>
           <div className="home-hero-trust">
             <span>
-              <LockKeyhole size={15} aria-hidden="true" /> No account
+              <LockKeyhole size={15} aria-hidden="true" /> {t("home.noAccount")}
             </span>
             <span>
-              <ShieldCheck size={15} aria-hidden="true" /> Files stay in your
-              browser
+              <ShieldCheck size={15} aria-hidden="true" />{" "}
+              {t("home.localFiles")}
             </span>
           </div>
         </div>
@@ -2241,38 +3502,30 @@ export function HomePage() {
       <section className="home-argument">
         <div className="shell-width home-argument-grid">
           <div className="home-section-lead">
-            <span className="eyebrow">Why FormPack</span>
-            <h2>Most compressors stop at “smaller.”</h2>
-            <p>
-              FormPack starts with the portal rule and makes the measurable part
-              of the job explicit.
-            </p>
+            <span className="eyebrow">{t("home.why")}</span>
+            <h2>{t("home.whyTitle")}</h2>
+            <p>{t("home.whyBody")}</p>
           </div>
           <div className="home-proof-list">
             <div>
               <span className="home-proof-index">01</span>
               <div>
-                <h3>Exact range, not a guess</h3>
-                <p>Set a minimum and maximum in KB, then check the output.</p>
+                <h3>{t("home.proof1Title")}</h3>
+                <p>{t("home.proof1Body")}</p>
               </div>
             </div>
             <div>
               <span className="home-proof-index">02</span>
               <div>
-                <h3>Private by default</h3>
-                <p>
-                  Your photo or document stays on this device while it is
-                  processed.
-                </p>
+                <h3>{t("home.proof2Title")}</h3>
+                <p>{t("home.proof2Body")}</p>
               </div>
             </div>
             <div>
               <span className="home-proof-index">03</span>
               <div>
-                <h3>Built for a deadline</h3>
-                <p>
-                  Clear inputs, useful defaults, and one obvious next action.
-                </p>
+                <h3>{t("home.proof3Title")}</h3>
+                <p>{t("home.proof3Body")}</p>
               </div>
             </div>
           </div>
@@ -2281,12 +3534,9 @@ export function HomePage() {
 
       <section className="home-tools shell-width">
         <div className="home-section-lead">
-          <span className="eyebrow">Three focused tools</span>
-          <h2>Choose the file you need to make fit.</h2>
-          <p>
-            One file at a time for compression. Add images only when you are
-            making a PDF.
-          </p>
+          <span className="eyebrow">{t("home.toolsKicker")}</span>
+          <h2>{t("home.toolsTitle")}</h2>
+          <p>{t("home.toolsIntro")}</p>
         </div>
         <div className="home-tool-grid">
           <Link className="home-tool-card" to="/photo-compressor">
@@ -2294,10 +3544,10 @@ export function HomePage() {
             <span className="home-tool-icon">
               <SlotIcon slot={{ kind: "photo" }} />
             </span>
-            <h3>Photo compressor</h3>
-            <p>Reach a portal’s exact KB range without leaving your browser.</p>
+            <h3>{t("home.toolPhoto")}</h3>
+            <p>{t("home.toolPhotoBody")}</p>
             <span className="home-tool-action">
-              Open photo tool <ArrowRight size={15} aria-hidden="true" />
+              {t("home.openPhoto")} <ArrowRight size={15} aria-hidden="true" />
             </span>
           </Link>
           <Link className="home-tool-card" to="/pdf-compressor">
@@ -2305,12 +3555,10 @@ export function HomePage() {
             <span className="home-tool-icon">
               <SlotIcon slot={{ kind: "pdf" }} />
             </span>
-            <h3>PDF compressor</h3>
-            <p>
-              Reduce a scanned document to the size the application form allows.
-            </p>
+            <h3>{t("home.toolPdf")}</h3>
+            <p>{t("home.toolPdfBody")}</p>
             <span className="home-tool-action">
-              Open PDF tool <ArrowRight size={15} aria-hidden="true" />
+              {t("home.openPdf")} <ArrowRight size={15} aria-hidden="true" />
             </span>
           </Link>
           <Link className="home-tool-card" to="/photo-to-pdf">
@@ -2318,23 +3566,54 @@ export function HomePage() {
             <span className="home-tool-icon">
               <ImagePlus size={22} strokeWidth={1.6} aria-hidden="true" />
             </span>
-            <h3>Combine images into one PDF</h3>
-            <p>Combine a photo, signature, or thumb impression into one PDF.</p>
+            <h3>{t("home.toolCombine")}</h3>
+            <p>{t("home.toolCombineBody")}</p>
             <span className="home-tool-action">
-              Combine images <ArrowRight size={16} aria-hidden="true" />
+              {t("home.combineImages")} <ArrowRight size={16} aria-hidden="true" />
             </span>
+          </Link>
+        </div>
+        <div className="home-tool-links">
+          <Link className="text-link" to="/batch">
+            {t("home.batchLink")} →
+          </Link>
+          <Link className="text-link" to="/file-checker">
+            {t("home.checkerLink")} →
           </Link>
         </div>
       </section>
 
       <section className="guide-teaser-section shell-width">
         <div className="section-heading">
-          <span className="eyebrow">Practical checklists</span>
-          <h2>Know the rule before you touch the file.</h2>
-          <p>
-            Short, plain-language guides for the upload problems that cause
-            avoidable rejections.
-          </p>
+          <span className="eyebrow">{t("home.presetsKicker")}</span>
+          <h2>{t("home.presetsTitle")}</h2>
+          <p>{t("home.presetsIntro")}</p>
+        </div>
+        <div className="guide-teaser-grid">
+          {examPresets.slice(0, 3).map((preset) => (
+            <Link
+              className="guide-teaser-card"
+              key={preset.slug}
+              to="/presets/$slug"
+              params={{ slug: preset.slug }}
+            >
+              <span className="guide-card-audience">{preset.authority}</span>
+              <h3>{preset.exam}</h3>
+              <p>{preset.summary}</p>
+              <span className="text-link">{t("home.openPreset")} →</span>
+            </Link>
+          ))}
+        </div>
+        <Link className="text-link guide-index-link" to="/presets">
+          {t("home.allPresets")} →
+        </Link>
+      </section>
+
+      <section className="guide-teaser-section shell-width">
+        <div className="section-heading">
+          <span className="eyebrow">{t("home.guidesKicker")}</span>
+          <h2>{t("home.guidesTitle")}</h2>
+          <p>{t("home.guidesIntro")}</p>
         </div>
         <div className="guide-teaser-grid">
           {seoGuides.slice(0, 3).map((guide) => (
@@ -2347,40 +3626,34 @@ export function HomePage() {
               <span>{guide.audience}</span>
               <h3>{guide.title}</h3>
               <p>{guide.summary}</p>
-              <span className="text-link">Read the checklist →</span>
+              <span className="text-link">{t("home.readChecklist")} →</span>
             </Link>
           ))}
         </div>
         <Link className="text-link guide-index-link" to="/guides">
-          Browse all file guides →
+          {t("home.allGuides")} →
         </Link>
       </section>
 
       <section className="privacy-section shell-width">
         <PrivacyNotice />
         <div className="privacy-detail">
-          <h2>Measured by the tool. Judged by you.</h2>
+          <h2>{t("home.privacyTitle")}</h2>
           <div className="check-columns">
             <div>
-              <span className="column-label">FormPack can check</span>
+              <span className="column-label">{t("home.canCheck")}</span>
               <ul>
-                <CheckLine ready>File format and byte size</CheckLine>
-                <CheckLine ready>Dimensions and aspect ratio</CheckLine>
-                <CheckLine ready>Filename and PDF page count</CheckLine>
+                <CheckLine ready>{t("home.check1")}</CheckLine>
+                <CheckLine ready>{t("home.check2")}</CheckLine>
+                <CheckLine ready>{t("home.check3")}</CheckLine>
               </ul>
             </div>
             <div>
-              <span className="column-label">You still review</span>
+              <span className="column-label">{t("home.youReview")}</span>
               <ul>
-                <CheckLine ready={false}>
-                  Face position and background
-                </CheckLine>
-                <CheckLine ready={false}>
-                  Signature clarity and legibility
-                </CheckLine>
-                <CheckLine ready={false}>
-                  Portal-specific visual instructions
-                </CheckLine>
+                <CheckLine ready={false}>{t("home.review1")}</CheckLine>
+                <CheckLine ready={false}>{t("home.review2")}</CheckLine>
+                <CheckLine ready={false}>{t("home.review3")}</CheckLine>
               </ul>
             </div>
           </div>
@@ -2390,13 +3663,10 @@ export function HomePage() {
       <section className="closing-section">
         <div className="shell-width closing-inner">
           <div>
-            <h2>Start with the upload rule.</h2>
-            <p>
-              Enter the size range first. FormPack handles the mechanical work
-              locally.
-            </p>
+            <h2>{t("home.closingTitle")}</h2>
+            <p>{t("home.closingBody")}</p>
           </div>
-          <ActionLink to="/photo-compressor">Compress a photo</ActionLink>
+          <ActionLink to="/photo-compressor">{t("home.start")}</ActionLink>
         </div>
       </section>
 
@@ -2486,6 +3756,257 @@ export function CategoryPage() {
           </p>
         </div>
       </div>
+    </PageFrame>
+  )
+}
+
+function fieldActionLabel(field: ExamPreset["fields"][number]) {
+  if (field.kind === "photo") return "Open photo tool"
+  if (field.kind === "pdf") return "Open PDF tool"
+  return "Open signature tool"
+}
+
+export function PresetsPage() {
+  return (
+    <PageFrame
+      title="Exam file presets"
+      intro="Start with the photo, signature, and document values commonly published for your exam. Confirm every value against the current official notice."
+      seo={{
+        title: "Exam photo and signature presets | FormPack",
+        description:
+          "Browse exam-specific photo, signature, thumb impression, and declaration rules for SSC, IBPS, SBI, RRB, NTA, and other applications.",
+        path: "/presets",
+      }}
+    >
+      <div className="guide-grid">
+        {examPresets.map((preset) => (
+          <Link
+            className="guide-card"
+            key={preset.slug}
+            to="/presets/$slug"
+            params={{ slug: preset.slug }}
+          >
+            <span className="guide-card-audience">{preset.authority}</span>
+            <h2>{preset.exam}</h2>
+            <p>{preset.summary}</p>
+            <ul className="preset-fields">
+              {preset.fields.map((field) => (
+                <li key={field.kind}>
+                  <strong>{field.label}:</strong> {field.format} ·{" "}
+                  {field.minKb}–{field.maxKb} KB · {field.dimensionsLabel}
+                </li>
+              ))}
+            </ul>
+            <span className="text-link">Open preset →</span>
+          </Link>
+        ))}
+      </div>
+      <p className="preset-disclaimer">
+        These presets are a preparation reference, not an official approval.
+        Exam requirements can change between cycles. Always open the current
+        notice before submitting.
+      </p>
+    </PageFrame>
+  )
+}
+
+export function PresetPage() {
+  const { slug } = useParams({ from: "/presets/$slug" })
+  const preset = getExamPreset(slug)
+
+  if (!preset) return <NotFoundPage />
+
+  const presetPath = `/presets/${preset.slug}`
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Article",
+        headline: `${preset.exam} photo and signature requirements`,
+        description: preset.summary,
+        url: `${SITE_URL}${presetPath}`,
+        datePublished: preset.updatedAt,
+        dateModified: preset.updatedAt,
+        author: { "@type": "Organization", name: SITE.author },
+        publisher: {
+          "@type": "Organization",
+          name: SITE.name,
+          url: SITE_URL,
+        },
+        isPartOf: { "@type": "WebSite", name: SITE.name, url: SITE_URL },
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          {
+            "@type": "ListItem",
+            position: 1,
+            name: "Home",
+            item: SITE_URL,
+          },
+          {
+            "@type": "ListItem",
+            position: 2,
+            name: "Exam presets",
+            item: `${SITE_URL}/presets`,
+          },
+          {
+            "@type": "ListItem",
+            position: 3,
+            name: preset.exam,
+            item: `${SITE_URL}${presetPath}`,
+          },
+        ],
+      },
+    ],
+  }
+
+  return (
+    <PageFrame
+      title={`${preset.exam} photo and signature requirements`}
+      intro={preset.summary}
+      seo={{
+        title: `${preset.exam} photo and signature requirements | FormPack`,
+        description: preset.summary,
+        path: presetPath,
+        type: "article",
+        jsonLd,
+      }}
+    >
+      <article className="guide-article">
+        <div className="guide-article-meta">
+          <span>{preset.authority}</span>
+          <span>{preset.cycle}</span>
+          <span>Last updated {formatDate(preset.updatedAt)}</span>
+        </div>
+
+        <div className="preset-actions">
+          <RuleLinkButton
+            href={presetFieldHref(preset, preset.fields[0])}
+            label="Copy rule link"
+          />
+        </div>
+
+        <section>
+          <h2>Upload rules</h2>
+          <div className="preset-table-wrap">
+            <table className="preset-table">
+              <thead>
+                <tr>
+                  <th>Field</th>
+                  <th>Format</th>
+                  <th>Size</th>
+                  <th>Dimensions</th>
+                  <th>Prepare</th>
+                </tr>
+              </thead>
+              <tbody>
+                {preset.fields.map((field) => (
+                  <tr key={field.kind}>
+                    <td>
+                      <strong>{field.label}</strong>
+                      {field.notes ? <small>{field.notes}</small> : null}
+                    </td>
+                    <td>{field.format}</td>
+                    <td>
+                      {field.minKb}–{field.maxKb} KB
+                    </td>
+                    <td>{field.dimensionsLabel}</td>
+                    <td>
+                      <a href={presetFieldHref(preset, field)}>
+                        {fieldActionLabel(field)} →
+                      </a>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section>
+          <h2>How to prepare the files</h2>
+          <ol>
+            {preset.steps.map((step) => (
+              <li key={step}>{step}</li>
+            ))}
+          </ol>
+        </section>
+
+        <section>
+          <h2>Important notes</h2>
+          <ul>
+            {preset.notes.map((note) => (
+              <li key={note}>{note}</li>
+            ))}
+          </ul>
+        </section>
+
+        <section>
+          <h2>Official source</h2>
+          <p>
+            <a
+              href={preset.source.url}
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              {preset.source.label}
+            </a>
+          </p>
+          {preset.guideSlug ? (
+            <p>
+              <Link
+                to="/guides/$slug"
+                params={{ slug: preset.guideSlug }}
+              >
+                Read the full preparation guide →
+              </Link>
+            </p>
+          ) : null}
+        </section>
+
+        <section className="guide-cta">
+          <h2>Ready to prepare a file?</h2>
+          <p>
+            Use the values above, then compare the result with the current
+            official notice before uploading.
+          </p>
+          <div className="guide-cta-actions">
+            <a
+              className="action-link"
+              href={presetFieldHref(preset, preset.fields[0])}
+            >
+              <span>{fieldActionLabel(preset.fields[0])}</span>
+              <ArrowRight size={18} aria-hidden="true" />
+            </a>
+            <Link
+              className="action-link action-link-secondary"
+              to="/presets"
+            >
+              <span>Browse all presets</span>
+              <ArrowRight size={18} aria-hidden="true" />
+            </Link>
+          </div>
+        </section>
+
+        <nav className="related-guides" aria-label="Related exam presets">
+          <h2>Related exam presets</h2>
+          <div>
+            {examPresets
+              .filter((item) => item.slug !== preset.slug)
+              .slice(0, 4)
+              .map((item) => (
+                <Link
+                  key={item.slug}
+                  to="/presets/$slug"
+                  params={{ slug: item.slug }}
+                >
+                  {item.exam} →
+                </Link>
+              ))}
+          </div>
+        </nav>
+      </article>
     </PageFrame>
   )
 }
@@ -2812,9 +4333,14 @@ export function FilesPage() {
   const { slots, attachFile } = usePack()
   const attached = slots.filter((slot) => slot.source).length
 
-  const onFile = (slotId: string, event: ChangeEvent<HTMLInputElement>) => {
+  const onFile = async (slotId: string, event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (file) attachFile(slotId, file)
+    if (!file) return
+    try {
+      attachFile(slotId, await normalizeImageFile(file))
+    } catch {
+      attachFile(slotId, file)
+    }
   }
 
   return (
@@ -2875,7 +4401,11 @@ export function FilesPage() {
             <label className="file-button">
               <input
                 type="file"
-                accept={slot.kind === "pdf" ? "application/pdf" : "image/*"}
+                accept={
+                  slot.kind === "pdf"
+                    ? "application/pdf"
+                    : "image/*,.heic,.heif,image/heic,image/heif"
+                }
                 onChange={(event) => onFile(slot.id, event)}
               />
               <span>{slot.source ? "Replace file" : "Choose file"}</span>
@@ -3530,7 +5060,7 @@ export function FixPage({
               <h2 id="fix-file-title" className="text-[1.2rem] font-[680] tracking-[-.025em]">Choose the file the portal rejected</h2>
             </div>
             <label className="mx-5 mt-5 flex min-h-64 cursor-pointer flex-col items-center justify-center gap-3 rounded-[var(--radius-sm)] border border-dashed border-[var(--border)] bg-[var(--canvas)] p-6 text-center transition-colors duration-150 hover:border-[var(--ink)] hover:bg-[var(--raised)] has-[input:focus-visible]:outline has-[input:focus-visible]:outline-2 has-[input:focus-visible]:outline-[var(--focus)]">
-              <input className="sr-only" type="file" accept={draft.format === "PDF" ? "application/pdf" : "image/*"} onChange={(event) => { const file = event.target.files?.[0]; if (file) attachFile(file) }} />
+              <input className="sr-only" type="file" accept={draft.format === "PDF" ? "application/pdf" : "image/*,.heic,.heif,image/heic,image/heif"} onChange={(event) => { const file = event.target.files?.[0]; if (!file) return; void normalizeImageFile(file).then((normalized) => attachFile(normalized)).catch(() => attachFile(file)) }} />
               {previewUrl && draft.format !== "PDF" ? <img src={previewUrl} alt="Rejected file preview" className="max-h-36 max-w-[12rem] rounded border border-[var(--border)] bg-white object-contain [outline:1px_solid_oklch(0_0_0_/_0.1)]" /> : <span className="grid h-12 w-12 place-items-center rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--quiet)]"><FileWarning size={22} strokeWidth={1.6} aria-hidden="true" /></span>}
               <strong className="max-w-full break-words text-[.86rem]">{draft.source?.name ?? "Choose a file"}</strong>
               <span className="text-[.75rem] text-[var(--muted)]">{draft.source ? "Choose another file" : `Accepted: ${draft.format}`}</span>
