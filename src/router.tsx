@@ -11,7 +11,9 @@ import {
   CategoryPage,
   CheckPage,
   ContactPage,
+  CookiesPage,
   DownloadPage,
+  EditorialPage,
   FileWorkspacePage,
   FilesPage,
   FixPage,
@@ -28,6 +30,7 @@ import {
   PrivacyPage,
   QuickToolsPage,
   RequirementsPage,
+  TermsPage,
 } from "@/pages"
 
 export const queryClient = new QueryClient({
@@ -116,12 +119,6 @@ const quickToolsRoute = createRoute({
   component: () => <QuickToolsPage />,
 })
 
-const imageSizeRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/quick-tools/image-size",
-  component: PhotoCompressorPage,
-})
-
 const photoCompressorRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/photo-compressor",
@@ -138,12 +135,6 @@ const signatureRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/quick-tools/signature",
   component: SignaturePage,
-})
-
-const pdfSizeRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/quick-tools/pdf-size",
-  component: PdfCompressorPage,
 })
 
 const pdfCompressorRoute = createRoute({
@@ -168,6 +159,24 @@ const limitationsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/limitations",
   component: LimitationsPage,
+})
+
+const termsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/terms",
+  component: TermsPage,
+})
+
+const editorialRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/editorial",
+  component: EditorialPage,
+})
+
+const cookiesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/cookies",
+  component: CookiesPage,
 })
 
 const aboutRoute = createRoute({
@@ -207,15 +216,16 @@ const routeTree = rootRoute.addChildren([
   fixFileRoute,
   fixResultRoute,
   quickToolsRoute,
-  imageSizeRoute,
   photoCompressorRoute,
   imageDimensionsRoute,
   signatureRoute,
-  pdfSizeRoute,
   pdfCompressorRoute,
   photoToPdfRoute,
   privacyRoute,
   limitationsRoute,
+  termsRoute,
+  editorialRoute,
+  cookiesRoute,
   aboutRoute,
   contactRoute,
   guidesRoute,

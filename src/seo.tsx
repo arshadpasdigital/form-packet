@@ -112,8 +112,7 @@ export function pageMeta(
     pathname.startsWith("/prepare/") ||
     pathname === "/fix" ||
     pathname.startsWith("/fix/") ||
-    pathname === "/quick-tools" ||
-    pathname.startsWith("/quick-tools/")
+    pathname === "/quick-tools"
 
   return {
     title: title.includes("FormPack") ? title : `${title} | FormPack`,

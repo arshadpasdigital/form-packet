@@ -820,6 +820,47 @@ svg {
   font-weight: 650;
 }
 
+.guide-article h3 {
+  margin: 1.25rem 0 0;
+  font-size: 1.02rem;
+  letter-spacing: -0.01em;
+}
+
+.guide-article a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.faq-item h3 {
+  margin-block-start: 1.4rem;
+}
+
+.tool-article {
+  margin-block-start: clamp(3rem, 6vw, 5rem);
+  padding-block-start: clamp(1rem, 2vw, 2rem);
+  border-block-start: 1px solid var(--border);
+}
+
+.home-article {
+  padding-block: clamp(4rem, 8vw, 7rem);
+}
+
+.page-updated,
+.contact-email {
+  color: var(--quiet);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.contact-email a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
 .privacy-section {
   padding-block: clamp(5rem, 10vw, 8rem);
 }
@@ -960,6 +1001,8 @@ svg {
 
 .footer-grid nav {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 1.25rem;
   font-size: 0.8rem;
 }

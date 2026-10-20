@@ -18,6 +18,12 @@ import {
   type ReactNode,
 } from "react"
 
+import type {
+  ArticleContent,
+  ContentSection,
+  Faq,
+  SourceLink,
+} from "@/content"
 import { packSteps, type PackSlot, type SlotStatus } from "@/data"
 import { ADSENSE_CLIENT } from "@/lib/ads"
 import { pageMeta, SeoHead, type SeoMeta } from "@/seo"
@@ -174,11 +180,14 @@ export function SiteFooter() {
           <Link to="/about">About</Link>
           <Link to="/contact">Contact</Link>
           <Link to="/privacy">Privacy</Link>
+          <Link to="/cookies">Cookies</Link>
+          <Link to="/terms">Terms</Link>
+          <Link to="/editorial">Editorial</Link>
           <Link to="/limitations">Limitations</Link>
         </nav>
         <p className="footer-note">
           FormPack checks file rules. It cannot guarantee approval by a portal
-          or authority.
+          or authority. Always confirm the current official instructions.
         </p>
       </div>
     </footer>
@@ -216,6 +225,82 @@ export function PageFrame({
         {children}
       </section>
     </>
+  )
+}
+
+export function ArticleBody({
+  sections,
+  faqs,
+  sources,
+}: {
+  sections: ContentSection[]
+  faqs?: Faq[]
+  sources?: SourceLink[]
+}) {
+  return (
+    <>
+      {sections.map((section) => (
+        <section key={section.heading}>
+          <h2>{section.heading}</h2>
+          {section.paragraphs?.map((paragraph) => (
+            <p key={paragraph}>{paragraph}</p>
+          ))}
+          {section.bullets?.length ? (
+            <ul>
+              {section.bullets.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
+      ))}
+      {faqs?.length ? (
+        <section>
+          <h2>Frequently asked questions</h2>
+          {faqs.map((faq) => (
+            <div className="faq-item" key={faq.question}>
+              <h3>{faq.question}</h3>
+              <p>{faq.answer}</p>
+            </div>
+          ))}
+        </section>
+      ) : null}
+      {sources?.length ? (
+        <section>
+          <h2>Sources and further reading</h2>
+          <ul>
+            {sources.map((source) => (
+              <li key={source.url}>
+                <a href={source.url} rel="noopener noreferrer" target="_blank">
+                  {source.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+    </>
+  )
+}
+
+export function ArticleBlock({
+  content,
+  className = "",
+}: {
+  content: ArticleContent
+  className?: string
+}) {
+  return (
+    <article className={`guide-article ${className}`.trim()}>
+      {content.intro.map((paragraph) => (
+        <p key={paragraph}>{paragraph}</p>
+      ))}
+      <ArticleBody
+        sections={content.sections}
+        faqs={content.faqs}
+        sources={content.sources}
+      />
+    </article>
   )
 }
 

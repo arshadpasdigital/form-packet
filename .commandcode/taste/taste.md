@@ -1,4 +1,4 @@
-- Prefers to be shown/explained the correct approach and options before edits are applied directly. Confidence: 0.75
+- Prefers to be shown/explained the correct approach and options before edits are applied directly; when reporting a problem (e.g. a policy/audit failure) expects a full diagnosis of causes plus a concrete remediation plan before any code is touched. Confidence: 0.8
 - Prefers multi-step tasks be executed step by step (sequenced, incremental) rather than all at once. Confidence: 0.8
 - Prefers a task tracker (todo/checklist) be used to track progress across multi-step work. Confidence: 0.8
 - Values polished, easy-to-use UX and expects UI changes to prioritize clarity and usability. Confidence: 0.8

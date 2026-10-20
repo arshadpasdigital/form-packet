@@ -30,12 +30,22 @@ import {
 import {
   ActionLink,
   AdSlot,
+  ArticleBlock,
+  ArticleBody,
   CheckLine,
   PageFrame,
   PrivacyNotice,
   SlotIcon,
   StatusLabel,
 } from "@/components"
+import {
+  SITE,
+  formatDate,
+  homeContent,
+  sitePages,
+  toolContent,
+  type ArticleContent,
+} from "@/content"
 import {
   categories,
   fileTypeMatches,
@@ -519,6 +529,11 @@ export function PhotoCompressorPage() {
           </div>
         </section>
 
+        <ArticleBlock
+          content={toolContent["/photo-compressor"]}
+          className="tool-article"
+        />
+
         <AdSlot slot={adSlots.toolBottom} className="mt-6" />
       </section>
     </>
@@ -900,6 +915,11 @@ export function PdfCompressorPage() {
             </div>
           </div>
         </section>
+
+        <ArticleBlock
+          content={toolContent["/pdf-compressor"]}
+          className="tool-article"
+        />
 
         <AdSlot slot={adSlots.toolBottom} className="mt-6" />
       </section>
@@ -1332,6 +1352,11 @@ export function PhotoToPdfPage() {
           </div>
         </section>
 
+        <ArticleBlock
+          content={toolContent["/photo-to-pdf"]}
+          className="tool-article"
+        />
+
         <AdSlot slot={adSlots.toolBottom} className="mt-6" />
       </section>
     </>
@@ -1754,6 +1779,11 @@ export function ImageDimensionsPage() {
             </div>
           </div>
         </section>
+
+        <ArticleBlock
+          content={toolContent["/quick-tools/image-dimensions"]}
+          className="tool-article"
+        />
       </section>
     </>
   )
@@ -2114,6 +2144,11 @@ export function SignaturePage() {
             </div>
           </div>
         </section>
+
+        <ArticleBlock
+          content={toolContent["/quick-tools/signature"]}
+          className="tool-article"
+        />
       </section>
     </>
   )
@@ -2364,6 +2399,10 @@ export function HomePage() {
           <ActionLink to="/photo-compressor">Compress a photo</ActionLink>
         </div>
       </section>
+
+      <section className="shell-width home-article">
+        <ArticleBlock content={homeContent} />
+      </section>
     </>
   )
 }
@@ -2498,8 +2537,24 @@ export function GuidePage() {
         headline: guide.title,
         description: guide.description,
         url: `${SITE_URL}${guidePath}`,
-        isPartOf: { "@type": "WebSite", name: "FormPack", url: SITE_URL },
+        datePublished: guide.updatedAt,
+        dateModified: guide.updatedAt,
+        author: { "@type": "Organization", name: SITE.author },
+        publisher: {
+          "@type": "Organization",
+          name: SITE.name,
+          url: SITE_URL,
+        },
+        isPartOf: { "@type": "WebSite", name: SITE.name, url: SITE_URL },
         about: guide.audience,
+      },
+      {
+        "@type": "FAQPage",
+        mainEntity: guide.faqs.map((faq) => ({
+          "@type": "Question",
+          name: faq.question,
+          acceptedAnswer: { "@type": "Answer", text: faq.answer },
+        })),
       },
       {
         "@type": "BreadcrumbList",
@@ -2542,40 +2597,14 @@ export function GuidePage() {
       <article className="guide-article">
         <div className="guide-article-meta">
           <span>{guide.audience}</span>
-          <span>Updated for a local-first workflow</span>
+          <span>By {SITE.author}</span>
+          <span>Last updated {formatDate(guide.updatedAt)}</span>
         </div>
-        <section>
-          <h2>Start with the official rule</h2>
-          <p>
-            Portal requirements change. Copy the latest instruction into your
-            own checklist, then use the sections below to separate values a
-            browser can measure from details you need to inspect yourself.
-          </p>
-        </section>
-        <section>
-          <h2>Checks to record</h2>
-          <ul>
-            {guide.checks.map((check) => (
-              <li key={check}>{check}</li>
-            ))}
-          </ul>
-        </section>
-        <section>
-          <h2>A safe preparation sequence</h2>
-          <ol>
-            {guide.steps.map((step) => (
-              <li key={step}>{step}</li>
-            ))}
-          </ol>
-        </section>
-        <section>
-          <h2>Common avoidable mistakes</h2>
-          <ul>
-            {guide.mistakes.map((mistake) => (
-              <li key={mistake}>{mistake}</li>
-            ))}
-          </ul>
-        </section>
+        <ArticleBody
+          sections={guide.sections}
+          faqs={guide.faqs}
+          sources={guide.sources}
+        />
         <section className="guide-cta">
           <h2>Ready to check a file?</h2>
           <p>
@@ -3611,130 +3640,61 @@ export function QuickToolsPage({ tool }: { tool?: string }) {
   )
 }
 
-export function PrivacyPage() {
+function PolicyPage({ content }: { content: ArticleContent }) {
   return (
-    <PageFrame
-      title="Your documents stay on your device."
-      intro="FormPack is designed so sensitive application files do not need to leave your browser."
-    >
+    <PageFrame title={content.title} intro={content.intro[0]}>
       <article className="prose-page">
-        <section>
-          <h2>Local processing</h2>
-          <p>
-            File analysis, image preparation, PDF preparation, and package
-            creation run in your browser. FormPack does not need an account or
-            cloud document storage for the core workflow, and it does not
-            receive the files you add.
-          </p>
-        </section>
-        <section>
-          <h2>Aggregate product analytics</h2>
-          <p>
-            FormPack may count privacy-safe events such as a workflow starting
-            or finishing. Filenames, file contents, entered requirements, and
-            generated previews are never included.
-          </p>
-        </section>
-        <section>
-          <h2>Advertising and cookies</h2>
-          <p>
-            FormPack may show advertising served by Google AdSense. Google and
-            its partners may use cookies to serve ads based on prior visits to
-            this or other websites. You can opt out of personalised advertising
-            in Google’s Ads Settings, or use a tracking blocker to disable it.
-            Advertising does not have access to the files you process.
-          </p>
-        </section>
+        <p className="page-updated">
+          Last updated {formatDate(content.updatedAt)}
+        </p>
+        <ArticleBody
+          sections={content.sections}
+          faqs={content.faqs}
+          sources={content.sources}
+        />
       </article>
     </PageFrame>
   )
 }
 
+export function PrivacyPage() {
+  return <PolicyPage content={sitePages.privacy} />
+}
+
 export function AboutPage() {
-  return (
-    <PageFrame
-      title="About FormPack"
-      intro="FormPack helps applicants turn a strict upload rule into a file that passes its measurable checks — without sending the file anywhere."
-    >
-      <article className="prose-page">
-        <section>
-          <h2>Why FormPack exists</h2>
-          <p>
-            Exam, job, visa, and admission portals reject files for reasons
-            software can measure: wrong format, wrong byte size, or wrong
-            dimensions. FormPack focuses on those measurable checks and leaves
-            visual judgment with the applicant.
-          </p>
-        </section>
-        <section>
-          <h2>Local-first by design</h2>
-          <p>
-            Photos and documents are sensitive. FormPack processes them in the
-            browser, so the file never has to be uploaded to a FormPack server.
-          </p>
-        </section>
-        <section>
-          <h2>What FormPack is not</h2>
-          <p>
-            FormPack cannot guarantee that a portal or authority will approve a
-            file. Always check the latest official instructions before you
-            submit.
-          </p>
-        </section>
-      </article>
-    </PageFrame>
-  )
+  return <PolicyPage content={sitePages.about} />
+}
+
+export function LimitationsPage() {
+  return <PolicyPage content={sitePages.limitations} />
+}
+
+export function TermsPage() {
+  return <PolicyPage content={sitePages.terms} />
+}
+
+export function EditorialPage() {
+  return <PolicyPage content={sitePages.editorial} />
+}
+
+export function CookiesPage() {
+  return <PolicyPage content={sitePages.cookies} />
 }
 
 export function ContactPage() {
   return (
     <PageFrame
-      title="Contact FormPack"
-      intro="Questions, corrections, or feedback about the tools and the guides."
+      title={sitePages.contact.title}
+      intro={sitePages.contact.intro[0]}
     >
       <article className="prose-page">
-        <section>
-          <h2>Email</h2>
-          <p>
-            Reach the maintainer at{" "}
-            <a href="mailto:support@formpack.app">support@formpack.app</a>.
-          </p>
-        </section>
-        <section>
-          <h2>Do not send documents</h2>
-          <p>
-            Please do not attach application photos, signatures, or documents.
-            FormPack is a local tool and cannot inspect individual files.
-          </p>
-        </section>
-      </article>
-    </PageFrame>
-  )
-}
-
-export function LimitationsPage() {
-  return (
-    <PageFrame
-      title="What FormPack can and cannot confirm."
-      intro="Mechanical checks are useful evidence, not a guarantee that a third-party portal will approve a file."
-    >
-      <article className="prose-page">
-        <section>
-          <h2>Reliable mechanical checks</h2>
-          <p>
-            FormPack can measure file type, byte size, pixel dimensions, aspect
-            ratio, orientation, filename, and PDF page count when the browser
-            supports the file.
-          </p>
-        </section>
-        <section>
-          <h2>Human review still matters</h2>
-          <p>
-            Background quality, face position, signature clarity, legibility,
-            and unusual portal instructions require your judgment. Always check
-            the latest official instructions before submission.
-          </p>
-        </section>
+        <p className="contact-email">
+          <a href={`mailto:${SITE.email}`}>{SITE.email}</a>
+        </p>
+        <ArticleBody
+          sections={sitePages.contact.sections}
+          faqs={sitePages.contact.faqs}
+        />
       </article>
     </PageFrame>
   )
