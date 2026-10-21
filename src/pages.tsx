@@ -736,6 +736,8 @@ export function BatchPage() {
     !processing &&
     !converting
   const doneCount = items.filter((item) => item.status === "done").length
+  const errorCount = items.filter((item) => item.status === "error").length
+  const processedCount = doneCount + errorCount
   const inRangeCount = items.filter((item) => item.result?.inRange).length
   const totalInputBytes = items.reduce((sum, item) => sum + item.file.size, 0)
   const totalOutputBytes = items.reduce(
@@ -1010,6 +1012,7 @@ export function BatchPage() {
 
           <form
             className="min-w-0 border border-[var(--border)] bg-[var(--surface)] p-[clamp(1.25rem,3vw,2rem)]"
+            aria-busy={processing}
             onSubmit={(event) => event.preventDefault()}
           >
             <div className="text-[.68rem] uppercase tracking-[.05em] text-[var(--quiet)] [font-family:var(--font-mono)]">
@@ -1140,8 +1143,12 @@ export function BatchPage() {
                   ? t("batch.converting")
                   : !items.length
                     ? t("batch.noFiles")
-                    : doneCount === items.length && !processing
-                      ? t("batch.complete")
+                    : processedCount === items.length && !processing
+                      ? `${t("batch.complete")} ${inRangeCount}/${items.length} ${t("batch.inRange")}${
+                          errorCount
+                            ? ` · ${errorCount} ${t("batch.errors")}`
+                            : ""
+                        }`
                       : !rangeIsValid
                         ? t("batch.targetSize")
                         : !dimensionsAreValid
@@ -1158,7 +1165,7 @@ export function BatchPage() {
               >
                 {processing
                   ? t("batch.compressing")
-                  : doneCount === items.length && items.length > 0
+                  : processedCount === items.length && items.length > 0
                     ? t("batch.compressAgain")
                     : t("batch.compress")}{" "}
                 <ArrowRight size={16} aria-hidden="true" />
@@ -1184,7 +1191,7 @@ export function BatchPage() {
               </h2>
             </div>
             <span className="text-[.72rem] text-[var(--muted)]">
-              {doneCount}/{items.length} {t("batch.files")} · {inRangeCount}{" "}
+              {processedCount}/{items.length} {t("batch.files")} · {inRangeCount}{" "}
               {t("batch.inRange")}
             </span>
           </div>
@@ -1491,7 +1498,7 @@ export function FileCheckerPage() {
             ) : null}
 
             {error ? (
-              <p className="mt-4 text-[.78rem] text-[var(--danger)]" role="status">
+              <p className="mt-4 text-[.78rem] text-[var(--danger)]" role="alert">
                 {error}
               </p>
             ) : null}
@@ -1506,6 +1513,7 @@ export function FileCheckerPage() {
 
           <form
             className="min-w-0 border border-[var(--border)] bg-[var(--surface)] p-[clamp(1.25rem,3vw,2rem)]"
+            aria-busy={checking}
             onSubmit={(event) => event.preventDefault()}
           >
             <div className="text-[.68rem] uppercase tracking-[.05em] text-[var(--quiet)] [font-family:var(--font-mono)]">
@@ -1623,7 +1631,9 @@ export function FileCheckerPage() {
                   : !picked
                     ? t("checker.noFile")
                     : result
-                      ? t("checker.complete")
+                      ? `${t("checker.complete")} ${
+                          measuredPass ? t("checker.pass") : t("checker.fail")
+                        }`
                       : t("checker.ready")}
               </span>
               <button
@@ -3417,7 +3427,8 @@ export function SignaturePage() {
 }
 
 export function HomePage() {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
+  const contentLang = locale === "hi" ? "en" : undefined
 
   return (
     <>
@@ -3451,7 +3462,11 @@ export function HomePage() {
           </div>
         </div>
 
-        <div className="range-workspace" aria-label="Example exact-size result">
+        <div
+          className="range-workspace"
+          aria-label="Example exact-size result"
+          lang={contentLang}
+        >
           <div className="range-workspace-bar">
             <span>Illustrative result</span>
             <span className="range-workspace-route">photo / compress</span>
@@ -3540,7 +3555,9 @@ export function HomePage() {
         </div>
         <div className="home-tool-grid">
           <Link className="home-tool-card" to="/photo-compressor">
-            <span className="home-tool-label">Photo</span>
+            <span className="home-tool-label" lang={contentLang}>
+              Photo
+            </span>
             <span className="home-tool-icon">
               <SlotIcon slot={{ kind: "photo" }} />
             </span>
@@ -3551,7 +3568,9 @@ export function HomePage() {
             </span>
           </Link>
           <Link className="home-tool-card" to="/pdf-compressor">
-            <span className="home-tool-label">PDF</span>
+            <span className="home-tool-label" lang={contentLang}>
+              PDF
+            </span>
             <span className="home-tool-icon">
               <SlotIcon slot={{ kind: "pdf" }} />
             </span>
@@ -3562,7 +3581,9 @@ export function HomePage() {
             </span>
           </Link>
           <Link className="home-tool-card" to="/photo-to-pdf">
-            <span className="home-tool-label">Photo → PDF</span>
+            <span className="home-tool-label" lang={contentLang}>
+              Photo → PDF
+            </span>
             <span className="home-tool-icon">
               <ImagePlus size={22} strokeWidth={1.6} aria-hidden="true" />
             </span>
@@ -3597,9 +3618,11 @@ export function HomePage() {
               to="/presets/$slug"
               params={{ slug: preset.slug }}
             >
-              <span className="guide-card-audience">{preset.authority}</span>
-              <h3>{preset.exam}</h3>
-              <p>{preset.summary}</p>
+              <span className="guide-card-audience" lang={contentLang}>
+                {preset.authority}
+              </span>
+              <h3 lang={contentLang}>{preset.exam}</h3>
+              <p lang={contentLang}>{preset.summary}</p>
               <span className="text-link">{t("home.openPreset")} →</span>
             </Link>
           ))}
@@ -3623,9 +3646,9 @@ export function HomePage() {
               to="/guides/$slug"
               params={{ slug: guide.slug }}
             >
-              <span>{guide.audience}</span>
-              <h3>{guide.title}</h3>
-              <p>{guide.summary}</p>
+              <span lang={contentLang}>{guide.audience}</span>
+              <h3 lang={contentLang}>{guide.title}</h3>
+              <p lang={contentLang}>{guide.summary}</p>
               <span className="text-link">{t("home.readChecklist")} →</span>
             </Link>
           ))}
@@ -3888,31 +3911,39 @@ export function PresetPage() {
         </div>
 
         <section>
-          <h2>Upload rules</h2>
-          <div className="preset-table-wrap">
+          <h2 id="preset-rules-title">Upload rules</h2>
+          <div
+            className="preset-table-wrap"
+            tabIndex={0}
+            role="region"
+            aria-labelledby="preset-rules-title"
+          >
             <table className="preset-table">
+              <caption className="sr-only">
+                {preset.exam} upload rules
+              </caption>
               <thead>
                 <tr>
-                  <th>Field</th>
-                  <th>Format</th>
-                  <th>Size</th>
-                  <th>Dimensions</th>
-                  <th>Prepare</th>
+                  <th scope="col">Field</th>
+                  <th scope="col">Format</th>
+                  <th scope="col">Size</th>
+                  <th scope="col">Dimensions</th>
+                  <th scope="col">Prepare</th>
                 </tr>
               </thead>
               <tbody>
                 {preset.fields.map((field) => (
                   <tr key={field.kind}>
-                    <td>
+                    <td data-label="Field">
                       <strong>{field.label}</strong>
                       {field.notes ? <small>{field.notes}</small> : null}
                     </td>
-                    <td>{field.format}</td>
-                    <td>
+                    <td data-label="Format">{field.format}</td>
+                    <td data-label="Size">
                       {field.minKb}–{field.maxKb} KB
                     </td>
-                    <td>{field.dimensionsLabel}</td>
-                    <td>
+                    <td data-label="Dimensions">{field.dimensionsLabel}</td>
+                    <td data-label="Prepare">
                       <a href={presetFieldHref(preset, field)}>
                         {fieldActionLabel(field)} →
                       </a>
@@ -3944,7 +3975,7 @@ export function PresetPage() {
 
         <section>
           <h2>Official source</h2>
-          <p>
+          <p className="preset-source">
             <a
               href={preset.source.url}
               rel="noopener noreferrer"
@@ -3954,7 +3985,7 @@ export function PresetPage() {
             </a>
           </p>
           {preset.guideSlug ? (
-            <p>
+            <p className="preset-guide-link">
               <Link
                 to="/guides/$slug"
                 params={{ slug: preset.guideSlug }}
@@ -4563,7 +4594,7 @@ export function FileWorkspacePage() {
             </div>
             <Link
               to="/prepare/files"
-              className="shrink-0 text-[.78rem] font-[680] text-[var(--ink)] underline decoration-[var(--border)] underline-offset-4 transition-colors hover:decoration-[var(--signal)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--focus)]"
+              className="inline-flex min-h-11 shrink-0 items-center text-[.78rem] font-[680] text-[var(--ink)] underline decoration-[var(--border)] underline-offset-4 transition-colors hover:decoration-[var(--signal)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--focus)]"
             >
               {slot.source ? "Replace file" : "Choose file"}
             </Link>
@@ -4690,7 +4721,7 @@ export function FileWorkspacePage() {
         </div>
         <Link
           to="/prepare/files"
-          className="shrink-0 text-[.78rem] font-[680] text-[var(--ink)] underline decoration-[var(--border)] underline-offset-4 transition-colors hover:decoration-[var(--signal)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--focus)]"
+          className="inline-flex min-h-11 shrink-0 items-center text-[.78rem] font-[680] text-[var(--ink)] underline decoration-[var(--border)] underline-offset-4 transition-colors hover:decoration-[var(--signal)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--focus)]"
         >
           Back to file list
         </Link>
@@ -4940,7 +4971,7 @@ export function DownloadPage() {
 
       <div className="mt-5 flex items-center justify-between gap-4 border-y border-[var(--border-soft)] py-4 max-[46rem]:items-start max-[46rem]:flex-col">
         <p className="text-[.76rem] leading-[1.5] text-[var(--muted)]">Need to change a file? You can return to the review list without losing the pack.</p>
-        <Link to="/prepare/check" className="shrink-0 text-[.78rem] font-[680] text-[var(--ink)] underline decoration-[var(--border)] underline-offset-4 transition-colors hover:decoration-[var(--signal)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--focus)]">Back to checks</Link>
+        <Link to="/prepare/check" className="inline-flex min-h-11 shrink-0 items-center text-[.78rem] font-[680] text-[var(--ink)] underline decoration-[var(--border)] underline-offset-4 transition-colors hover:decoration-[var(--signal)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--focus)]">Back to checks</Link>
       </div>
     </PageFrame>
   )
@@ -5118,7 +5149,7 @@ export function FixPage({
           </Link>
         ))}
         </div>
-        <aside className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--canvas)] p-5"><div className="flex gap-3"><ScanSearch className="mt-0.5 shrink-0 text-[var(--signal)]" size={18} strokeWidth={1.8} aria-hidden="true" /><div><h2 className="text-[.86rem] font-[680]">Why start here?</h2><p className="mt-2 text-[.78rem] leading-[1.5] text-[var(--muted)]">A rejection message is a clue, not a complete specification. We’ll ask for the exact format, size, and visual rule next.</p></div></div><button type="button" className="mt-5 text-[.75rem] font-[680] text-[var(--ink)] underline decoration-[var(--border)] underline-offset-4" onClick={reset}>Clear previous fix</button></aside>
+        <aside className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--canvas)] p-5"><div className="flex gap-3"><ScanSearch className="mt-0.5 shrink-0 text-[var(--signal)]" size={18} strokeWidth={1.8} aria-hidden="true" /><div><h2 className="text-[.86rem] font-[680]">Why start here?</h2><p className="mt-2 text-[.78rem] leading-[1.5] text-[var(--muted)]">A rejection message is a clue, not a complete specification. We’ll ask for the exact format, size, and visual rule next.</p></div></div><button type="button" className="mt-5 inline-flex min-h-11 items-center text-[.75rem] font-[680] text-[var(--ink)] underline decoration-[var(--border)] underline-offset-4" onClick={reset}>Clear previous fix</button></aside>
       </div>
     </PageFrame>
   )

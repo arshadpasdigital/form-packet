@@ -30,14 +30,43 @@ import { LanguageSwitcher, useI18n } from "@/i18n"
 import { ADSENSE_CLIENT } from "@/lib/ads"
 import { pageMeta, SeoHead, type SeoMeta } from "@/seo"
 
+const localizedRoutes = new Set([
+  "/",
+  "/photo-compressor",
+  "/pdf-compressor",
+  "/batch",
+  "/file-checker",
+])
+
 export function AppShell() {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   const [menuOpen, setMenuOpen] = useState(false)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   })
+  const previousPath = useRef(pathname)
   const isPack = pathname.startsWith("/prepare")
+  const contentLang =
+    locale === "hi" && !localizedRoutes.has(pathname) ? "en" : undefined
+
+  useEffect(() => {
+    if (previousPath.current === pathname) return
+    previousPath.current = pathname
+    let secondFrame = 0
+    const firstFrame = requestAnimationFrame(() => {
+      secondFrame = requestAnimationFrame(() => {
+        const heading = document.querySelector<HTMLElement>("main h1")
+        if (!heading) return
+        heading.tabIndex = -1
+        heading.focus({ preventScroll: true })
+      })
+    })
+    return () => {
+      cancelAnimationFrame(firstFrame)
+      cancelAnimationFrame(secondFrame)
+    }
+  }, [pathname])
 
   useEffect(() => {
     if (!menuOpen) return
@@ -140,7 +169,7 @@ export function AppShell() {
       </header>
 
       {isPack ? <PackStepRail /> : null}
-      <main id="main-content">
+      <main id="main-content" lang={contentLang}>
         <Outlet />
       </main>
       <SiteFooter />
@@ -275,7 +304,7 @@ export function ArticleBody({
   faqs?: Faq[]
   sources?: SourceLink[]
 }) {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
 
   return (
     <>
@@ -296,7 +325,7 @@ export function ArticleBody({
       ))}
       {faqs?.length ? (
         <section>
-          <h2>{t("article.faq")}</h2>
+          <h2 lang={locale === "hi" ? "hi" : undefined}>{t("article.faq")}</h2>
           {faqs.map((faq) => (
             <div className="faq-item" key={faq.question}>
               <h3>{faq.question}</h3>
@@ -306,8 +335,10 @@ export function ArticleBody({
         </section>
       ) : null}
       {sources?.length ? (
-        <section>
-          <h2>{t("article.sources")}</h2>
+        <section className="sources-list">
+          <h2 lang={locale === "hi" ? "hi" : undefined}>
+            {t("article.sources")}
+          </h2>
           <ul>
             {sources.map((source) => (
               <li key={source.url}>
@@ -330,8 +361,13 @@ export function ArticleBlock({
   content: ArticleContent
   className?: string
 }) {
+  const { locale } = useI18n()
+
   return (
-    <article className={`guide-article ${className}`.trim()}>
+    <article
+      className={`guide-article ${className}`.trim()}
+      lang={locale === "hi" ? "en" : undefined}
+    >
       {content.intro.map((paragraph) => (
         <p key={paragraph}>{paragraph}</p>
       ))}

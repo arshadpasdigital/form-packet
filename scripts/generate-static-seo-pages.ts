@@ -248,11 +248,11 @@ function presetBody(preset: ExamPreset) {
   const rows = preset.fields
     .map(
       (field) =>
-        `<tr><td><strong>${escapeHtml(field.label)}</strong>${
+        `<tr><td data-label="Field"><strong>${escapeHtml(field.label)}</strong>${
           field.notes ? `<small>${escapeHtml(field.notes)}</small>` : ""
-        }</td><td>${field.format}</td><td>${field.minKb}–${field.maxKb} KB</td><td>${escapeHtml(
+        }</td><td data-label="Format">${field.format}</td><td data-label="Size">${field.minKb}–${field.maxKb} KB</td><td data-label="Dimensions">${escapeHtml(
           field.dimensionsLabel
-        )}</td><td><a href="${escapeHtml(presetFieldHref(preset, field))}">Open tool →</a></td></tr>`
+        )}</td><td data-label="Prepare"><a href="${escapeHtml(presetFieldHref(preset, field))}">Open tool →</a></td></tr>`
     )
     .join("")
   const steps = `<ol>${preset.steps
@@ -262,7 +262,7 @@ function presetBody(preset: ExamPreset) {
     .map((note) => `<li>${escapeHtml(note)}</li>`)
     .join("")}</ul>`
   const guide = preset.guideSlug
-    ? `<p><a href="/guides/${escapeHtml(preset.guideSlug)}">Read the full preparation guide →</a></p>`
+    ? `<p class="preset-guide-link"><a href="/guides/${escapeHtml(preset.guideSlug)}">Read the full preparation guide →</a></p>`
     : ""
   const meta = `<div class="guide-article-meta"><span>${escapeHtml(
     preset.authority
@@ -274,11 +274,11 @@ function presetBody(preset: ExamPreset) {
       preset.exam
     )} photo and signature requirements</h1><p>${escapeHtml(
       preset.summary
-    )}</p><section><h2>Upload rules</h2><div class="preset-table-wrap"><table class="preset-table"><thead><tr><th>Field</th><th>Format</th><th>Size</th><th>Dimensions</th><th>Prepare</th></tr></thead><tbody>${rows}</tbody></table></div></section><section><h2>How to prepare the files</h2>${steps}</section><section><h2>Important notes</h2>${notes}</section><section><h2>Official source</h2><p><a href="${escapeHtml(
+    )}</p><section><h2 id="preset-rules-title">Upload rules</h2><div class="preset-table-wrap" tabindex="0" role="region" aria-labelledby="preset-rules-title"><table class="preset-table"><caption class="sr-only">${escapeHtml(preset.exam)} upload rules</caption><thead><tr><th scope="col">Field</th><th scope="col">Format</th><th scope="col">Size</th><th scope="col">Dimensions</th><th scope="col">Prepare</th></tr></thead><tbody>${rows}</tbody></table></div></section><section><h2>How to prepare the files</h2>${steps}</section><section><h2>Important notes</h2>${notes}</section><section><h2>Official source</h2><p class="preset-source"><a href="${escapeHtml(
       preset.source.url
     )}" rel="noopener noreferrer">${escapeHtml(
       preset.source.label
-    )}</a></p>${guide}</section><p><a href="/presets">Browse all exam presets</a> · <a href="/photo-compressor">Open the photo tool</a> · <a href="/guides">Read the guides</a></p></article></main>`
+    )}</a></p>${guide}</section><p class="preset-guide-link"><a href="/presets">Browse all exam presets</a> · <a href="/photo-compressor">Open the photo tool</a> · <a href="/guides">Read the guides</a></p></article></main>`
   )
 }
 
@@ -422,7 +422,17 @@ function policySchema(content: ArticleContent, pathName: string, siteUrl: string
 
 export function generateStaticSeoPages(root = process.cwd()) {
   const outDir = path.join(root, "dist")
-  const baseHtml = fs.readFileSync(path.join(outDir, "index.html"), "utf8")
+  const rawBaseHtml = fs.readFileSync(path.join(outDir, "index.html"), "utf8")
+  const assetsDir = path.join(outDir, "assets")
+  const fontFile = fs.existsSync(assetsDir)
+    ? fs
+        .readdirSync(assetsDir)
+        .find((file) => /^geist-latin-wght-normal-.*\.woff2$/.test(file))
+    : undefined
+  const fontPreload = fontFile
+    ? `<link rel="preload" href="/assets/${fontFile}" as="font" type="font/woff2" crossorigin />\n  `
+    : ""
+  const baseHtml = rawBaseHtml.replace("</head>", `${fontPreload}</head>`)
   const siteUrl = (process.env.VITE_SITE_URL ?? SITE.url).replace(/\/$/, "")
 
   const utilityPaths = [

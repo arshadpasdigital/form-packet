@@ -21,3 +21,9 @@ createRoot(root).render(
     </I18nProvider>
   </StrictMode>
 )
+
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  void navigator.serviceWorker.register("/sw.js").catch(() => {
+    // The tools remain usable without offline caching.
+  })
+}

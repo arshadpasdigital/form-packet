@@ -579,6 +579,12 @@
       "skillPath": "interaction-design/skills/millers-law/SKILL.md",
       "computedHash": "e3bbc272a87142d1544751568856e3133eb8815f5450e21b1fbff4f75f0f9763"
     },
+    "modern-web-guidance": {
+      "source": "googlechrome/modern-web-guidance",
+      "sourceType": "github",
+      "skillPath": "skills/modern-web-guidance/SKILL.md",
+      "computedHash": "48405ce3611ebdfd7958978117501d0b3d36ac91048cb3a43b36233e8e839d52"
+    },
     "motion-system": {
       "source": "owl-listener/designer-skills",
       "sourceType": "github",
