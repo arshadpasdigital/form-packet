@@ -48,6 +48,11 @@ import {
   type ArticleContent,
 } from "@/content"
 import {
+  examFamilies,
+  getExamFamily,
+  getExamFamilyForExam,
+} from "@/exam-families"
+import {
   examPresets,
   getExamPreset,
   presetFieldHref,
@@ -98,6 +103,7 @@ export function PhotoCompressorPage() {
   const searchFit = initialSearch.get("fit")
   const presetSlug = initialSearch.get("preset") ?? undefined
   const preset = presetSlug ? getExamPreset(presetSlug) : undefined
+  const presetFamily = preset ? getExamFamilyForExam(preset.slug) : undefined
 
   const [source, setSource] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState("")
@@ -266,10 +272,10 @@ export function PhotoCompressorPage() {
             <p className="mt-6 max-w-[58ch] text-[1.05rem] text-[var(--muted)] [text-wrap:pretty]">
               {t("photo.intro")}
             </p>
-            {preset ? (
+            {preset && presetFamily ? (
               <p className="preset-loaded">
                 {t("photo.loadedFrom")}{" "}
-                <Link to="/presets/$slug" params={{ slug: preset.slug }}>
+                <Link to="/presets/$slug" params={{ slug: presetFamily.slug }}>
                   {preset.exam}
                 </Link>
                 . {t("photo.confirm")}
@@ -1731,6 +1737,7 @@ export function PdfCompressorPage() {
   const searchMax = initialSearch.get("max") ?? ""
   const presetSlug = initialSearch.get("preset") ?? undefined
   const preset = presetSlug ? getExamPreset(presetSlug) : undefined
+  const presetFamily = preset ? getExamFamilyForExam(preset.slug) : undefined
 
   const [source, setSource] = useState<File | null>(null)
   const [minKb, setMinKb] = useState(searchMin)
@@ -1849,10 +1856,10 @@ export function PdfCompressorPage() {
             <p className="mt-6 max-w-[58ch] text-[1.05rem] text-[var(--muted)] [text-wrap:pretty]">
               {t("pdf.intro")}
             </p>
-            {preset ? (
+            {preset && presetFamily ? (
               <p className="preset-loaded">
                 {t("pdf.loadedFrom")}{" "}
-                <Link to="/presets/$slug" params={{ slug: preset.slug }}>
+                <Link to="/presets/$slug" params={{ slug: presetFamily.slug }}>
                   {preset.exam}
                 </Link>
                 . {t("pdf.confirm")}
@@ -3611,18 +3618,18 @@ export function HomePage() {
           <p>{t("home.presetsIntro")}</p>
         </div>
         <div className="guide-teaser-grid">
-          {examPresets.slice(0, 3).map((preset) => (
+          {examFamilies.slice(0, 3).map((family) => (
             <Link
               className="guide-teaser-card"
-              key={preset.slug}
+              key={family.slug}
               to="/presets/$slug"
-              params={{ slug: preset.slug }}
+              params={{ slug: family.slug }}
             >
               <span className="guide-card-audience" lang={contentLang}>
-                {preset.authority}
+                {family.exams.length} exams
               </span>
-              <h3 lang={contentLang}>{preset.exam}</h3>
-              <p lang={contentLang}>{preset.summary}</p>
+              <h3 lang={contentLang}>{family.name}</h3>
+              <p lang={contentLang}>{family.description}</p>
               <span className="text-link">{t("home.openPreset")} →</span>
             </Link>
           ))}
@@ -3797,26 +3804,27 @@ export function PresetsPage() {
       seo={{
         title: "Exam photo and signature presets | FormPack",
         description:
-          "Browse exam-specific photo, signature, thumb impression, and declaration rules for SSC, IBPS, SBI, RRB, NTA, and other applications.",
+          "Compare photo, signature, thumb impression, and declaration rules for SSC, bank, railway, and NTA exam families.",
         path: "/presets",
       }}
     >
       <div className="guide-grid">
-        {examPresets.map((preset) => (
+        {examFamilies.map((family) => (
           <Link
             className="guide-card"
-            key={preset.slug}
+            key={family.slug}
             to="/presets/$slug"
-            params={{ slug: preset.slug }}
+            params={{ slug: family.slug }}
           >
-            <span className="guide-card-audience">{preset.authority}</span>
-            <h2>{preset.exam}</h2>
-            <p>{preset.summary}</p>
+            <span className="guide-card-audience">
+              {family.exams.length} exams
+            </span>
+            <h2>{family.name}</h2>
+            <p>{family.description}</p>
             <ul className="preset-fields">
-              {preset.fields.map((field) => (
-                <li key={field.kind}>
-                  <strong>{field.label}:</strong> {field.format} ·{" "}
-                  {field.minKb}–{field.maxKb} KB · {field.dimensionsLabel}
+              {family.exams.map((exam) => (
+                <li key={exam.slug}>
+                  <strong>{exam.exam}:</strong> {exam.summary}
                 </li>
               ))}
             </ul>
@@ -3835,21 +3843,24 @@ export function PresetsPage() {
 
 export function PresetPage() {
   const { slug } = useParams({ from: "/presets/$slug" })
-  const preset = getExamPreset(slug)
+  const family = getExamFamily(slug)
 
-  if (!preset) return <NotFoundPage />
+  if (!family) return <NotFoundPage />
 
-  const presetPath = `/presets/${preset.slug}`
+  const familyPath = `/presets/${family.slug}`
+  const guideSlugs = [
+    ...new Set(family.exams.map((exam) => exam.guideSlug)),
+  ].filter((guideSlug): guideSlug is string => Boolean(guideSlug))
   const jsonLd = {
     "@context": "https://schema.org",
     "@graph": [
       {
         "@type": "Article",
-        headline: `${preset.exam} photo and signature requirements`,
-        description: preset.summary,
-        url: `${SITE_URL}${presetPath}`,
-        datePublished: preset.updatedAt,
-        dateModified: preset.updatedAt,
+        headline: `${family.name} photo and signature requirements`,
+        description: family.description,
+        url: `${SITE_URL}${familyPath}`,
+        datePublished: family.updatedAt,
+        dateModified: family.updatedAt,
         author: { "@type": "Organization", name: SITE.author },
         publisher: {
           "@type": "Organization",
@@ -3857,6 +3868,15 @@ export function PresetPage() {
           url: SITE_URL,
         },
         isPartOf: { "@type": "WebSite", name: SITE.name, url: SITE_URL },
+        about: family.exams.map((exam) => exam.exam).join(", "),
+      },
+      {
+        "@type": "FAQPage",
+        mainEntity: family.faqs.map((faq) => ({
+          "@type": "Question",
+          name: faq.question,
+          acceptedAnswer: { "@type": "Answer", text: faq.answer },
+        })),
       },
       {
         "@type": "BreadcrumbList",
@@ -3876,8 +3896,8 @@ export function PresetPage() {
           {
             "@type": "ListItem",
             position: 3,
-            name: preset.exam,
-            item: `${SITE_URL}${presetPath}`,
+            name: family.name,
+            item: `${SITE_URL}${familyPath}`,
           },
         ],
       },
@@ -3886,113 +3906,168 @@ export function PresetPage() {
 
   return (
     <PageFrame
-      title={`${preset.exam} photo and signature requirements`}
-      intro={preset.summary}
+      title={`${family.name} photo and signature requirements`}
+      intro={family.description}
       seo={{
-        title: `${preset.exam} photo and signature requirements | FormPack`,
-        description: preset.summary,
-        path: presetPath,
+        title: family.seoTitle,
+        description: family.description,
+        path: familyPath,
         type: "article",
         jsonLd,
       }}
     >
       <article className="guide-article">
         <div className="guide-article-meta">
-          <span>{preset.authority}</span>
-          <span>{preset.cycle}</span>
-          <span>Last updated {formatDate(preset.updatedAt)}</span>
+          <span>{family.exams.length} exams covered</span>
+          <span>Last updated {formatDate(family.updatedAt)}</span>
         </div>
 
-        <div className="preset-actions">
-          <RuleLinkButton
-            href={presetFieldHref(preset, preset.fields[0])}
-            label="Copy rule link"
-          />
-        </div>
+        {family.intro.map((paragraph) => (
+          <p key={paragraph}>{paragraph}</p>
+        ))}
 
         <section>
-          <h2 id="preset-rules-title">Upload rules</h2>
-          <div
-            className="preset-table-wrap"
-            tabIndex={0}
-            role="region"
-            aria-labelledby="preset-rules-title"
-          >
-            <table className="preset-table">
-              <caption className="sr-only">
-                {preset.exam} upload rules
-              </caption>
-              <thead>
-                <tr>
-                  <th scope="col">Field</th>
-                  <th scope="col">Format</th>
-                  <th scope="col">Size</th>
-                  <th scope="col">Dimensions</th>
-                  <th scope="col">Prepare</th>
-                </tr>
-              </thead>
-              <tbody>
-                {preset.fields.map((field) => (
-                  <tr key={field.kind}>
-                    <td data-label="Field">
-                      <strong>{field.label}</strong>
-                      {field.notes ? <small>{field.notes}</small> : null}
-                    </td>
-                    <td data-label="Format">{field.format}</td>
-                    <td data-label="Size">
-                      {field.minKb}–{field.maxKb} KB
-                    </td>
-                    <td data-label="Dimensions">{field.dimensionsLabel}</td>
-                    <td data-label="Prepare">
-                      <a href={presetFieldHref(preset, field)}>
-                        {fieldActionLabel(field)} →
-                      </a>
-                    </td>
+          <h2>Exams covered</h2>
+          <ul>
+            {family.exams.map((exam) => (
+              <li key={exam.slug}>
+                <strong>{exam.exam}</strong> — {exam.authority} · {exam.cycle}.{" "}
+                {exam.summary}
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        {family.exams.map((exam) => (
+          <section key={exam.slug}>
+            <h2 id={`preset-rules-${exam.slug}`}>{exam.exam} upload rules</h2>
+            <div
+              className="preset-table-wrap"
+              tabIndex={0}
+              role="region"
+              aria-labelledby={`preset-rules-${exam.slug}`}
+            >
+              <table className="preset-table">
+                <caption className="sr-only">
+                  {exam.exam} upload rules
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Field</th>
+                    <th scope="col">Format</th>
+                    <th scope="col">Size</th>
+                    <th scope="col">Dimensions</th>
+                    <th scope="col">Prepare</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {exam.fields.map((field) => (
+                    <tr key={field.kind}>
+                      <td data-label="Field">
+                        <strong>{field.label}</strong>
+                        {field.notes ? <small>{field.notes}</small> : null}
+                      </td>
+                      <td data-label="Format">{field.format}</td>
+                      <td data-label="Size">
+                        {field.minKb}–{field.maxKb} KB
+                      </td>
+                      <td data-label="Dimensions">{field.dimensionsLabel}</td>
+                      <td data-label="Prepare">
+                        <a href={presetFieldHref(exam, field)}>
+                          {fieldActionLabel(field)} →
+                        </a>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="preset-source">
+              <a
+                href={exam.source.url}
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                {exam.source.label}
+              </a>
+            </p>
+          </section>
+        ))}
+
+        <section>
+          <h2>What changes between these exams</h2>
+          <ul>
+            {family.differences.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
         </section>
 
         <section>
           <h2>How to prepare the files</h2>
           <ol>
-            {preset.steps.map((step) => (
+            {family.steps.map((step) => (
               <li key={step}>{step}</li>
             ))}
           </ol>
         </section>
 
         <section>
+          <h2>Why a correctly sized file still gets rejected</h2>
+          <ul>
+            {family.rejectionReasons.map((reason) => (
+              <li key={reason}>{reason}</li>
+            ))}
+          </ul>
+        </section>
+
+        <section>
           <h2>Important notes</h2>
           <ul>
-            {preset.notes.map((note) => (
+            {family.notes.map((note) => (
               <li key={note}>{note}</li>
             ))}
           </ul>
         </section>
 
         <section>
-          <h2>Official source</h2>
-          <p className="preset-source">
-            <a
-              href={preset.source.url}
-              rel="noopener noreferrer"
-              target="_blank"
-            >
-              {preset.source.label}
-            </a>
-          </p>
-          {preset.guideSlug ? (
-            <p className="preset-guide-link">
-              <Link
-                to="/guides/$slug"
-                params={{ slug: preset.guideSlug }}
-              >
-                Read the full preparation guide →
-              </Link>
-            </p>
+          <h2>Frequently asked questions</h2>
+          {family.faqs.map((faq) => (
+            <div className="faq-item" key={faq.question}>
+              <h3>{faq.question}</h3>
+              <p>{faq.answer}</p>
+            </div>
+          ))}
+        </section>
+
+        <section className="sources-list">
+          <h2>Sources and further reading</h2>
+          <ul>
+            {family.sources.map((source) => (
+              <li key={source.url}>
+                <a href={source.url} rel="noopener noreferrer" target="_blank">
+                  {source.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+          {guideSlugs.length ? (
+            <ul>
+              {guideSlugs.map((guideSlug) => {
+                const guide = seoGuides.find((item) => item.slug === guideSlug)
+                if (!guide) return null
+                return (
+                  <li key={guide.slug}>
+                    <Link
+                      to="/guides/$slug"
+                      params={{ slug: guide.slug }}
+                    >
+                      {guide.title}
+                    </Link>
+                  </li>
+                )
+              })}
+            </ul>
           ) : null}
         </section>
 
@@ -4005,34 +4080,38 @@ export function PresetPage() {
           <div className="guide-cta-actions">
             <a
               className="action-link"
-              href={presetFieldHref(preset, preset.fields[0])}
+              href={presetFieldHref(
+                family.exams[0],
+                family.exams[0].fields[0],
+              )}
             >
-              <span>{fieldActionLabel(preset.fields[0])}</span>
+              <span>
+                {fieldActionLabel(family.exams[0].fields[0])}
+              </span>
               <ArrowRight size={18} aria-hidden="true" />
             </a>
             <Link
               className="action-link action-link-secondary"
               to="/presets"
             >
-              <span>Browse all presets</span>
+              <span>Browse all exam families</span>
               <ArrowRight size={18} aria-hidden="true" />
             </Link>
           </div>
         </section>
 
-        <nav className="related-guides" aria-label="Related exam presets">
-          <h2>Related exam presets</h2>
+        <nav className="related-guides" aria-label="Related exam families">
+          <h2>Related exam families</h2>
           <div>
-            {examPresets
-              .filter((item) => item.slug !== preset.slug)
-              .slice(0, 4)
+            {examFamilies
+              .filter((item) => item.slug !== family.slug)
               .map((item) => (
                 <Link
                   key={item.slug}
                   to="/presets/$slug"
                   params={{ slug: item.slug }}
                 >
-                  {item.exam} →
+                  {item.name} →
                 </Link>
               ))}
           </div>

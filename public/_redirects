@@ -1,0 +1,13 @@
+# Consolidated exam-family pages (old per-exam URLs)
+/presets/ssc-cgl /presets/ssc-exams 301
+/presets/ssc-chsl /presets/ssc-exams 301
+/presets/ssc-mts /presets/ssc-exams 301
+/presets/ssc-gd /presets/ssc-exams 301
+/presets/ibps-po /presets/bank-exams 301
+/presets/ibps-clerk /presets/bank-exams 301
+/presets/sbi-po /presets/bank-exams 301
+/presets/rrb-ntpc /presets/railway-exams 301
+/presets/rrb-group-d /presets/railway-exams 301
+/presets/rrb-alp /presets/railway-exams 301
+/presets/neet-ug /presets/nta-exams 301
+/presets/jee-main /presets/nta-exams 301

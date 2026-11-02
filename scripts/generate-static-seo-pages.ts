@@ -13,9 +13,11 @@ import {
   type SourceLink,
 } from "../src/content"
 import {
-  examPresets,
+  examFamilies,
+  type ExamFamily,
+} from "../src/exam-families"
+import {
   presetFieldHref,
-  type ExamPreset,
 } from "../src/exam-presets"
 import { seoGuides, type SeoGuide } from "../src/seo-data"
 
@@ -226,76 +228,111 @@ function guideIndexBody() {
 }
 
 function presetIndexBody() {
-  const items = examPresets
+  const items = examFamilies
     .map(
-      (preset) =>
-        `<li><a href="/presets/${escapeHtml(preset.slug)}">${escapeHtml(
-          preset.exam
-        )}</a> — ${escapeHtml(preset.summary)}<ul>${preset.fields
-          .map(
-            (field) =>
-              `<li><strong>${escapeHtml(field.label)}:</strong> ${field.format} · ${field.minKb}–${field.maxKb} KB · ${escapeHtml(field.dimensionsLabel)}</li>`
-          )
-          .join("")}</ul></li>`
+      (family) =>
+        `<li><a href="/presets/${escapeHtml(family.slug)}">${escapeHtml(
+          family.name
+        )}</a> — ${escapeHtml(family.description)}<br /><small>Covers: ${family.exams
+          .map((exam) => escapeHtml(exam.exam))
+          .join(", ")}</small></li>`
     )
     .join("")
   return staticShell(
-    `<main id="main-content" class="page-frame shell-width"><article class="guide-article"><h1>Exam file presets</h1><p>Start with the photo, signature, thumb impression, and declaration values commonly published for your exam. These presets are a preparation reference, not an official approval. Confirm every value against the current official notice.</p><ul>${items}</ul><p><a href="/photo-compressor">Compress a photo</a> · <a href="/pdf-compressor">Compress a PDF</a> · <a href="/guides">Read the guides</a></p></article></main>`
+    `<main id="main-content" class="page-frame shell-width"><article class="guide-article"><h1>Exam file presets</h1><p>Start with the photo, signature, thumb impression, and declaration values commonly published for your exam family. Each page compares the exams in the family, explains where the rules differ, and shows how to prepare every field. These presets are a preparation reference, not an official approval. Confirm every value against the current official notice.</p><ul>${items}</ul><p><a href="/photo-compressor">Compress a photo</a> · <a href="/pdf-compressor">Compress a PDF</a> · <a href="/guides">Read the guides</a></p></article></main>`
   )
 }
 
-function presetBody(preset: ExamPreset) {
-  const rows = preset.fields
+function presetBody(family: ExamFamily) {
+  const examItems = family.exams
     .map(
-      (field) =>
-        `<tr><td data-label="Field"><strong>${escapeHtml(field.label)}</strong>${
-          field.notes ? `<small>${escapeHtml(field.notes)}</small>` : ""
-        }</td><td data-label="Format">${field.format}</td><td data-label="Size">${field.minKb}–${field.maxKb} KB</td><td data-label="Dimensions">${escapeHtml(
-          field.dimensionsLabel
-        )}</td><td data-label="Prepare"><a href="${escapeHtml(presetFieldHref(preset, field))}">Open tool →</a></td></tr>`
+      (exam) =>
+        `<li><strong>${escapeHtml(exam.exam)}</strong> — ${escapeHtml(
+          exam.authority
+        )} · ${escapeHtml(exam.cycle)}. ${escapeHtml(exam.summary)}</li>`
     )
     .join("")
-  const steps = `<ol>${preset.steps
-    .map((step) => `<li>${escapeHtml(step)}</li>`)
-    .join("")}</ol>`
-  const notes = `<ul>${preset.notes
-    .map((note) => `<li>${escapeHtml(note)}</li>`)
-    .join("")}</ul>`
-  const guide = preset.guideSlug
-    ? `<p class="preset-guide-link"><a href="/guides/${escapeHtml(preset.guideSlug)}">Read the full preparation guide →</a></p>`
-    : ""
-  const meta = `<div class="guide-article-meta"><span>${escapeHtml(
-    preset.authority
-  )}</span><span>${escapeHtml(preset.cycle)}</span><span>Last updated ${escapeHtml(
-    formatDate(preset.updatedAt)
+
+  const tables = family.exams
+    .map((exam) => {
+      const rows = exam.fields
+        .map(
+          (field) =>
+            `<tr><td data-label="Field"><strong>${escapeHtml(field.label)}</strong>${
+              field.notes ? `<small>${escapeHtml(field.notes)}</small>` : ""
+            }</td><td data-label="Format">${field.format}</td><td data-label="Size">${field.minKb}–${field.maxKb} KB</td><td data-label="Dimensions">${escapeHtml(
+              field.dimensionsLabel
+            )}</td><td data-label="Prepare"><a href="${escapeHtml(presetFieldHref(exam, field))}">Open tool →</a></td></tr>`
+        )
+        .join("")
+      return `<section><h2>${escapeHtml(exam.exam)} upload rules</h2><div class="preset-table-wrap" tabindex="0" role="region" aria-label="${escapeHtml(exam.exam)} upload rules"><table class="preset-table"><caption class="sr-only">${escapeHtml(exam.exam)} upload rules</caption><thead><tr><th scope="col">Field</th><th scope="col">Format</th><th scope="col">Size</th><th scope="col">Dimensions</th><th scope="col">Prepare</th></tr></thead><tbody>${rows}</tbody></table></div><p class="preset-source"><a href="${escapeHtml(exam.source.url)}" rel="noopener noreferrer">${escapeHtml(exam.source.label)}</a></p></section>`
+    })
+    .join("")
+
+  const list = (items: string[], ordered = false) =>
+    `<${ordered ? "ol" : "ul"}>${items
+      .map((item) => `<li>${escapeHtml(item)}</li>`)
+      .join("")}</${ordered ? "ol" : "ul"}>`
+
+  const guideSlugs = [...new Set(family.exams.map((exam) => exam.guideSlug))]
+    .filter((slug): slug is string => Boolean(slug))
+  const guideLinks = guideSlugs
+    .map((slug) => {
+      const guide = seoGuides.find((item) => item.slug === slug)
+      return guide
+        ? `<li><a href="/guides/${escapeHtml(slug)}">${escapeHtml(guide.title)}</a></li>`
+        : ""
+    })
+    .filter(Boolean)
+    .join("")
+
+  const meta = `<div class="guide-article-meta"><span>${family.exams.length} exams covered</span><span>Last updated ${escapeHtml(
+    formatDate(family.updatedAt)
   )}</span></div>`
+
   return staticShell(
     `<main id="main-content" class="page-frame shell-width"><article class="guide-article">${meta}<h1>${escapeHtml(
-      preset.exam
-    )} photo and signature requirements</h1><p>${escapeHtml(
-      preset.summary
-    )}</p><section><h2 id="preset-rules-title">Upload rules</h2><div class="preset-table-wrap" tabindex="0" role="region" aria-labelledby="preset-rules-title"><table class="preset-table"><caption class="sr-only">${escapeHtml(preset.exam)} upload rules</caption><thead><tr><th scope="col">Field</th><th scope="col">Format</th><th scope="col">Size</th><th scope="col">Dimensions</th><th scope="col">Prepare</th></tr></thead><tbody>${rows}</tbody></table></div></section><section><h2>How to prepare the files</h2>${steps}</section><section><h2>Important notes</h2>${notes}</section><section><h2>Official source</h2><p class="preset-source"><a href="${escapeHtml(
-      preset.source.url
-    )}" rel="noopener noreferrer">${escapeHtml(
-      preset.source.label
-    )}</a></p>${guide}</section><p class="preset-guide-link"><a href="/presets">Browse all exam presets</a> · <a href="/photo-compressor">Open the photo tool</a> · <a href="/guides">Read the guides</a></p></article></main>`
+      family.name
+    )} photo and signature requirements</h1>${family.intro
+      .map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`)
+      .join("")}<section><h2>Exams covered</h2><ul>${examItems}</ul></section>${tables}<section><h2>What changes between these exams</h2>${list(
+      family.differences
+    )}</section><section><h2>How to prepare the files</h2>${list(
+      family.steps,
+      true
+    )}</section><section><h2>Why a correctly sized file still gets rejected</h2>${list(
+      family.rejectionReasons
+    )}</section><section><h2>Important notes</h2>${list(
+      family.notes
+    )}</section>${faqsHtml(family.faqs)}${sourcesHtml(
+      family.sources
+    )}${guideLinks ? `<section><h2>Related preparation guides</h2><ul>${guideLinks}</ul></section>` : ""}<p class="preset-guide-link"><a href="/presets">Browse all exam families</a> · <a href="/photo-compressor">Open the photo tool</a> · <a href="/guides">Read the guides</a></p></article></main>`
   )
 }
 
-function presetSchema(preset: ExamPreset, siteUrl: string) {
+function presetSchema(family: ExamFamily, siteUrl: string) {
   return {
     "@context": "https://schema.org",
     "@graph": [
       {
         "@type": "Article",
-        headline: `${preset.exam} photo and signature requirements`,
-        description: preset.summary,
-        url: `${siteUrl}/presets/${preset.slug}`,
-        datePublished: preset.updatedAt,
-        dateModified: preset.updatedAt,
+        headline: `${family.name} photo and signature requirements`,
+        description: family.description,
+        url: `${siteUrl}/presets/${family.slug}`,
+        datePublished: family.updatedAt,
+        dateModified: family.updatedAt,
         author: { "@type": "Organization", name: SITE.author },
         publisher: { "@type": "Organization", name: SITE.name, url: siteUrl },
         isPartOf: { "@type": "WebSite", name: SITE.name, url: siteUrl },
+        about: family.exams.map((exam) => exam.exam).join(", "),
+      },
+      {
+        "@type": "FAQPage",
+        mainEntity: family.faqs.map((faq) => ({
+          "@type": "Question",
+          name: faq.question,
+          acceptedAnswer: { "@type": "Answer", text: faq.answer },
+        })),
       },
       {
         "@type": "BreadcrumbList",
@@ -310,8 +347,8 @@ function presetSchema(preset: ExamPreset, siteUrl: string) {
           {
             "@type": "ListItem",
             position: 3,
-            name: preset.exam,
-            item: `${siteUrl}/presets/${preset.slug}`,
+            name: family.name,
+            item: `${siteUrl}/presets/${family.slug}`,
           },
         ],
       },
@@ -475,13 +512,13 @@ export function generateStaticSeoPages(root = process.cwd()) {
         url: `${siteUrl}/presets`,
       },
     },
-    ...examPresets.map((preset) => ({
-      pathName: `/presets/${preset.slug}`,
-      title: `${preset.exam} photo and signature requirements | FormPack`,
-      description: preset.summary,
-      body: presetBody(preset),
+    ...examFamilies.map((family) => ({
+      pathName: `/presets/${family.slug}`,
+      title: family.seoTitle,
+      description: family.description,
+      body: presetBody(family),
       type: "article" as const,
-      jsonLd: presetSchema(preset, siteUrl),
+      jsonLd: presetSchema(family, siteUrl),
     })),
     {
       pathName: "/guides",

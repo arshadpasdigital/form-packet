@@ -33,8 +33,6 @@ export type ExamPreset = {
   summary: string
   guideSlug?: string
   fields: PresetField[]
-  steps: string[]
-  notes: string[]
 }
 
 const photo = (
@@ -104,22 +102,6 @@ const declaration = (
     notes: "Write the exact sentence requested in the current notice.",
   }) satisfies PresetField
 
-const commonSteps = [
-  "Open the current official notice for your exam and copy the upload rules.",
-  "Capture the photo, signature, and other files at a higher resolution than the final output.",
-  "Crop the signature and thumb impression to the required ratio before resizing.",
-  "Use the linked FormPack tool to reach the size and dimension range.",
-  "Inspect each result at normal zoom before uploading it to the portal.",
-  "Keep the original files until the application is submitted successfully.",
-]
-
-const commonNotes = [
-  "Requirements can change between exam cycles. The current official notice always takes precedence.",
-  "The values on this page are a preparation reference, not an official approval.",
-  "Compress to the middle of the range when possible; do not aim at the exact maximum.",
-  "Keep a copy of the original photo and signature until the portal confirms the upload.",
-]
-
 export const examPresets: ExamPreset[] = [
   {
     slug: "ssc-cgl",
@@ -145,8 +127,6 @@ export const examPresets: ExamPreset[] = [
       ),
       signature(10, 20, 140, 60, "Handwritten signature on plain white paper."),
     ],
-    steps: commonSteps,
-    notes: commonNotes,
   },
   {
     slug: "ssc-chsl",
@@ -166,8 +146,6 @@ export const examPresets: ExamPreset[] = [
       photo(20, 50, 200, 230, "Plain light background; face centred."),
       signature(10, 20, 140, 60, "Full signature visible; no browser edges."),
     ],
-    steps: commonSteps,
-    notes: commonNotes,
   },
   {
     slug: "ssc-mts",
@@ -187,8 +165,6 @@ export const examPresets: ExamPreset[] = [
       photo(20, 50, 200, 230),
       signature(10, 20, 140, 60),
     ],
-    steps: commonSteps,
-    notes: commonNotes,
   },
   {
     slug: "ssc-gd",
@@ -208,8 +184,6 @@ export const examPresets: ExamPreset[] = [
       photo(20, 50, 200, 230),
       signature(10, 20, 140, 60),
     ],
-    steps: commonSteps,
-    notes: commonNotes,
   },
   {
     slug: "ibps-po",
@@ -231,8 +205,6 @@ export const examPresets: ExamPreset[] = [
       thumb(20, 50, 240, 240),
       declaration(50, 100, 800, 400),
     ],
-    steps: commonSteps,
-    notes: commonNotes,
   },
   {
     slug: "ibps-clerk",
@@ -254,8 +226,6 @@ export const examPresets: ExamPreset[] = [
       thumb(20, 50, 240, 240),
       declaration(50, 100, 800, 400),
     ],
-    steps: commonSteps,
-    notes: commonNotes,
   },
   {
     slug: "sbi-po",
@@ -275,8 +245,6 @@ export const examPresets: ExamPreset[] = [
       photo(20, 50, 200, 230),
       signature(10, 20, 140, 60),
     ],
-    steps: commonSteps,
-    notes: commonNotes,
   },
   {
     slug: "rrb-ntpc",
@@ -296,8 +264,6 @@ export const examPresets: ExamPreset[] = [
       photo(15, 40, 320, 240),
       signature(10, 40, 160, 80),
     ],
-    steps: commonSteps,
-    notes: commonNotes,
   },
   {
     slug: "rrb-group-d",
@@ -317,8 +283,6 @@ export const examPresets: ExamPreset[] = [
       photo(15, 40, 320, 240),
       signature(10, 40, 160, 80),
     ],
-    steps: commonSteps,
-    notes: commonNotes,
   },
   {
     slug: "rrb-alp",
@@ -338,8 +302,6 @@ export const examPresets: ExamPreset[] = [
       photo(15, 40, 320, 240),
       signature(10, 40, 160, 80),
     ],
-    steps: commonSteps,
-    notes: commonNotes,
   },
   {
     slug: "neet-ug",
@@ -360,8 +322,6 @@ export const examPresets: ExamPreset[] = [
       signature(4, 30, 140, 60),
       thumb(10, 200, 240, 240),
     ],
-    steps: commonSteps,
-    notes: commonNotes,
   },
   {
     slug: "jee-main",
@@ -382,8 +342,6 @@ export const examPresets: ExamPreset[] = [
       signature(4, 30, 140, 60),
       thumb(10, 200, 240, 240),
     ],
-    steps: commonSteps,
-    notes: commonNotes,
   },
 ]
 

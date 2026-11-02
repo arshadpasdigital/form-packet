@@ -15,7 +15,7 @@ const slugs = [...source.matchAll(/slug:\s*"([^"]+)"/g)].map(
   (match) => match[1]
 )
 const presetSource = fs.readFileSync(
-  new URL("../src/exam-presets.ts", import.meta.url),
+  new URL("../src/exam-families.ts", import.meta.url),
   "utf8"
 )
 const presetSlugs = [...presetSource.matchAll(/slug:\s*"([^"]+)"/g)].map(
