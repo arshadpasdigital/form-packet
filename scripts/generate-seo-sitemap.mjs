@@ -1,6 +1,8 @@
 import fs from "node:fs"
 
-const siteUrl = (process.env.VITE_SITE_URL ?? "https://formpack.app").replace(
+const siteUrl = (
+  process.env.VITE_SITE_URL ?? "https://www.formpack.online"
+).replace(
   /\/$/,
   ""
 )

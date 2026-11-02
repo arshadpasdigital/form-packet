@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://formpack.app/sitemap.xml
+Sitemap: https://www.formpack.online/sitemap.xml

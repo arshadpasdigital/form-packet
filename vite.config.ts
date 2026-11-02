@@ -11,9 +11,9 @@ export default defineConfig({
       name: "formpack-static-seo-pages",
       transformIndexHtml(html: string) {
         const siteUrl = (
-          process.env.VITE_SITE_URL ?? "https://formpack.app"
+          process.env.VITE_SITE_URL ?? "https://www.formpack.online"
         ).replace(/\/$/, "")
-        return html.replaceAll("https://formpack.app", siteUrl)
+        return html.replaceAll("https://www.formpack.online", siteUrl)
       },
       writeBundle() {
         generateStaticSeoPages()

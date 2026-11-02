@@ -26,7 +26,7 @@ export type ArticleContent = {
 
 export const SITE = {
   name: "FormPack",
-  url: "https://formpack.app",
+  url: "https://www.formpack.online",
   email: "support@formpack.app",
   author: "FormPack Editorial Team",
   updatedAt: "2026-10-20",

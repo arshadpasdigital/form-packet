@@ -1,7 +1,7 @@
 import { useEffect } from "react"
 
 export const SITE_URL = (
-  import.meta.env.VITE_SITE_URL ?? "https://formpack.app"
+  import.meta.env.VITE_SITE_URL ?? "https://www.formpack.online"
 ).replace(/\/$/, "")
 
 export type SeoJsonLd = Record<string, unknown>
