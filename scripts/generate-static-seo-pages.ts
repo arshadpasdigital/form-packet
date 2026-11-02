@@ -435,21 +435,21 @@ export function generateStaticSeoPages(root = process.cwd()) {
   const baseHtml = rawBaseHtml.replace("</head>", `${fontPreload}</head>`)
   const siteUrl = (process.env.VITE_SITE_URL ?? SITE.url).replace(/\/$/, "")
 
-  const utilityPaths = [
-    "/prepare",
-    "/prepare/requirements",
-    "/prepare/files",
-    "/prepare/file/photo",
-    "/prepare/file/signature",
-    "/prepare/file/certificate",
-    "/prepare/check",
-    "/prepare/download",
-    "/fix",
-    "/fix/requirements",
-    "/fix/file",
-    "/fix/result",
-    "/quick-tools",
-  ]
+  const utilityPages: Record<string, string> = {
+    "/prepare": "What are you applying for? | FormPack",
+    "/prepare/requirements": "Set the rule for each file. | FormPack",
+    "/prepare/files": "Add files from this device. | FormPack",
+    "/prepare/file/photo": "Inspect photo. | FormPack",
+    "/prepare/file/signature": "Inspect signature. | FormPack",
+    "/prepare/file/certificate": "Inspect certificate. | FormPack",
+    "/prepare/check": "Check every rule before download. | FormPack",
+    "/prepare/download": "Your pack is ready to leave this browser. | FormPack",
+    "/fix": "What did the portal reject? | FormPack",
+    "/fix/requirements": "Copy the portal rule. | FormPack",
+    "/fix/file": "Add the rejected file. | FormPack",
+    "/fix/result": "Review the correction. | FormPack",
+    "/quick-tools": "Fix one file without making a pack. | FormPack",
+  }
   const utilityBody = staticShell(
     `<main id="main-content" class="page-frame shell-width"><h1>FormPack file workflow</h1><p>This interactive utility is not a search landing page. Visit the home page to learn about local file preparation, or open a focused tool from the quick tools list.</p><p><a href="/">Return to FormPack</a> · <a href="/quick-tools">Quick tools</a></p></main>`
   )
@@ -563,9 +563,9 @@ export function generateStaticSeoPages(root = process.cwd()) {
       body: articlePageBody(sitePages.cookies),
       jsonLd: policySchema(sitePages.cookies, "/cookies", siteUrl),
     },
-    ...utilityPaths.map((pathName) => ({
+    ...Object.entries(utilityPages).map(([pathName, title]) => ({
       pathName,
-      title: "FormPack file workflow",
+      title,
       description:
         "Interactive FormPack workflow for checking application files locally.",
       body: utilityBody,
